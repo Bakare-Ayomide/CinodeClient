@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.db.AppDatabase
@@ -88,8 +89,52 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     private val _filteredLibraryItems = MutableStateFlow<List<JellyfinItem>>(emptyList())
     val filteredLibraryItems: StateFlow<List<JellyfinItem>> = _filteredLibraryItems.asStateFlow()
 
+    private val prefs = application.getSharedPreferences("cinode_user_session_prefs", Context.MODE_PRIVATE)
+
     init {
+        restoreUserSession()
         loadInitialServer()
+    }
+
+    private fun restoreUserSession() {
+        val isAuth = prefs.getBoolean("is_authenticated", false)
+        val email = prefs.getString("user_email", "") ?: ""
+        val name = prefs.getString("user_name", "") ?: ""
+        val onboardingDone = prefs.getBoolean("is_onboarding_completed", false)
+
+        if (isAuth) {
+            _uiState.value = _uiState.value.copy(
+                isAuthenticated = true,
+                currentUserEmail = email,
+                currentUserName = name.ifBlank { "Jellyfin User" },
+                showAuthFlow = false,
+                showOnboardingFlow = false,
+                isOnboardingCompleted = onboardingDone,
+                currentDestination = NavDestination.HOME
+            )
+        } else if (onboardingDone) {
+            _uiState.value = _uiState.value.copy(
+                isOnboardingCompleted = true,
+                showOnboardingFlow = false,
+                showAuthFlow = true
+            )
+        }
+    }
+
+    private fun saveUserSession(email: String, name: String) {
+        prefs.edit()
+            .putBoolean("is_authenticated", true)
+            .putString("user_email", email)
+            .putString("user_name", name)
+            .apply()
+    }
+
+    private fun clearUserSession() {
+        prefs.edit()
+            .putBoolean("is_authenticated", false)
+            .putString("user_email", "")
+            .putString("user_name", "")
+            .apply()
     }
 
     private fun loadInitialServer() {
@@ -305,10 +350,12 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun login(email: String, name: String) {
+        val finalName = name.ifBlank { "Jellyfin User" }
+        saveUserSession(email, finalName)
         _uiState.value = _uiState.value.copy(
             isAuthenticated = true,
             currentUserEmail = email,
-            currentUserName = name.ifBlank { "Jellyfin User" },
+            currentUserName = finalName,
             showAuthFlow = false,
             showOnboardingFlow = false,
             currentDestination = NavDestination.HOME
@@ -321,11 +368,14 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             val res = repository.connectToServer(serverUrl, username, pass)
             res.fold(
                 onSuccess = { server ->
+                    val email = if (username.contains("@")) username else "$username@jellyfin.local"
+                    val name = username.takeWhile { it != '@' }.ifBlank { "Jellyfin User" }
+                    saveUserSession(email, name)
                     _uiState.value = _uiState.value.copy(
                         activeServer = server,
                         isAuthenticated = true,
-                        currentUserEmail = if (username.contains("@")) username else "$username@jellyfin.local",
-                        currentUserName = username.takeWhile { it != '@' }.ifBlank { "Jellyfin User" },
+                        currentUserEmail = email,
+                        currentUserName = name,
                         showAuthFlow = false,
                         showOnboardingFlow = false,
                         isLoading = false,
@@ -351,11 +401,13 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             val res = repository.signupUser(name, email, pass, serverUrl)
             res.fold(
                 onSuccess = { server ->
+                    val finalName = name.ifBlank { "Jellyfin User" }
+                    saveUserSession(email, finalName)
                     _uiState.value = _uiState.value.copy(
                         activeServer = server,
                         isAuthenticated = true,
                         currentUserEmail = email,
-                        currentUserName = name.ifBlank { "Jellyfin User" },
+                        currentUserName = finalName,
                         showAuthFlow = false,
                         showOnboardingFlow = false,
                         isLoading = false,
@@ -447,6 +499,7 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun logout() {
+        clearUserSession()
         _uiState.value = _uiState.value.copy(
             isAuthenticated = false,
             showAuthFlow = true,
@@ -455,6 +508,7 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun finishOnboarding() {
+        prefs.edit().putBoolean("is_onboarding_completed", true).apply()
         _uiState.value = _uiState.value.copy(
             isOnboardingCompleted = true,
             showOnboardingFlow = false,
@@ -476,3 +530,6 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
         )
     }
 }
+
+typealias CinodeViewModel = JellyfinViewModel
+typealias CinodeUiState = JellyfinUiState

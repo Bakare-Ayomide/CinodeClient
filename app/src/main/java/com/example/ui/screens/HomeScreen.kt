@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -136,7 +137,7 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(560.dp)
+                    .heightIn(min = 340.dp, max = 520.dp)
             ) {
                 AnimatedContent(
                     targetState = currentHero,
@@ -407,7 +408,8 @@ fun HomeScreen(
                     items(movies) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -425,7 +427,8 @@ fun HomeScreen(
                     items(series) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -443,7 +446,8 @@ fun HomeScreen(
                     items(topRatedItems) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -461,7 +465,8 @@ fun HomeScreen(
                     items(actionSciFi) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -479,7 +484,8 @@ fun HomeScreen(
                     items(dramaThriller) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -497,7 +503,8 @@ fun HomeScreen(
                     items(adventureFantasy) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -515,7 +522,8 @@ fun HomeScreen(
                     items(comedyAnimation) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }
@@ -533,7 +541,8 @@ fun HomeScreen(
                     items(favoriteItems) { item ->
                         MediaPosterCard(
                             item = item,
-                            onClick = { onMediaClick(item) }
+                            onClick = { onMediaClick(item) },
+                            modifier = Modifier.width(130.dp)
                         )
                     }
                 }

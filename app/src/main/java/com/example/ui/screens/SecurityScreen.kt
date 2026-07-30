@@ -27,15 +27,27 @@ import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -69,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -81,6 +94,18 @@ import com.example.data.api.JellyfinUserResponse
 import com.example.data.model.JellyfinServer
 import com.example.ui.JellyfinViewModel
 import com.example.ui.components.TvFocusableCard
+import com.example.ui.theme.IconAmber
+import com.example.ui.theme.IconBlue
+import com.example.ui.theme.IconCyan
+import com.example.ui.theme.IconGreen
+import com.example.ui.theme.IconIndigo
+import com.example.ui.theme.IconLime
+import com.example.ui.theme.IconOrange
+import com.example.ui.theme.IconPink
+import com.example.ui.theme.IconPurple
+import com.example.ui.theme.IconRed
+import com.example.ui.theme.IconTeal
+import com.example.ui.theme.IconYellow
 import com.example.ui.theme.JellyfinBackground
 import com.example.ui.theme.JellyfinCardBackground
 import com.example.ui.theme.JellyfinCyan
@@ -165,7 +190,7 @@ fun SecurityScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isAdmin) "Jellyfin REST API Management & Server Controls" else "Access Restricted Area",
+                            text = if (isAdmin) "Cinode REST API Management & Server Controls" else "Access Restricted Area",
                             color = TextMuted,
                             fontSize = 12.sp
                         )
@@ -436,56 +461,142 @@ fun SecurityScreen(
                 ) {
                     MetricCard(
                         title = "TOTAL USERS",
-                        value = "${usersList.size.coerceAtLeast(1)} Users",
+                        value = "${usersList.size.coerceAtLeast(1)} Registered",
                         icon = Icons.Default.Group,
-                        accentColor = JellyfinCyan,
+                        accentColor = IconBlue,
                         modifier = Modifier.weight(1f)
                     )
                     MetricCard(
                         title = "ACTIVE SESSIONS",
                         value = "${sessionsList.size.coerceAtLeast(1)} Online",
                         icon = Icons.Default.Devices,
-                        accentColor = JellyfinPurple,
+                        accentColor = IconPurple,
                         modifier = Modifier.weight(1f)
                     )
                     MetricCard(
                         title = "MEDIA LIBRARIES",
-                        value = "${mediaFolders.size.coerceAtLeast(4)} Folders",
+                        value = "${mediaFolders.size.coerceAtLeast(4)} Catalogs",
                         icon = Icons.Default.Folder,
-                        accentColor = JellyfinRed,
+                        accentColor = IconOrange,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "HW TRANSCODER",
+                        value = "NVENC H.265",
+                        icon = Icons.Default.Speed,
+                        accentColor = IconGreen,
                         modifier = Modifier.weight(1f)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 3. Tab Navigation Row
-                val tabs = listOf("Users CRUD", "Active Sessions", "Libraries", "System & Logs")
+                // 3. Admin Area Navigation Menu Hub
+                Surface(
+                    color = JellyfinCardBackground,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = IconYellow, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "ADMIN AREA NAVIGATION MENU",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Grid of 6 Admin Navigation Shortcuts
+                        val menuItems = listOf(
+                            AdminMenuItem("User & Roles", "RBAC, Accounts & Permissions", Icons.Default.Group, IconBlue, 0),
+                            AdminMenuItem("Connected Sessions", "Active Devices & Terminals", Icons.Default.Devices, IconPurple, 1),
+                            AdminMenuItem("Storage & Catalogs", "Media Folders & Scans", Icons.Default.Folder, IconOrange, 2),
+                            AdminMenuItem("Hardware Engine", "CPU, RAM & Transcoding", Icons.Default.Speed, IconGreen, 3),
+                            AdminMenuItem("API Keys & Webhooks", "REST Tokens & OAuth", Icons.Default.Key, IconTeal, 4),
+                            AdminMenuItem("Security Audit Logs", "System Event Journal", Icons.Default.Terminal, IconRed, 5)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            menuItems.take(3).forEach { item ->
+                                AdminNavMenuCard(
+                                    item = item,
+                                    isSelected = selectedTab == item.tabIndex,
+                                    onSelect = { selectedTab = item.tabIndex },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            menuItems.drop(3).forEach { item ->
+                                AdminNavMenuCard(
+                                    item = item,
+                                    isSelected = selectedTab == item.tabIndex,
+                                    onSelect = { selectedTab = item.tabIndex },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // 4. Colorful Tab Navigation Row
+                val tabSpecs = listOf(
+                    TabSpec("Users", Icons.Default.Group, IconBlue),
+                    TabSpec("Sessions", Icons.Default.Devices, IconPurple),
+                    TabSpec("Libraries", Icons.Default.Folder, IconOrange),
+                    TabSpec("Transcoder", Icons.Default.Speed, IconGreen),
+                    TabSpec("API Keys", Icons.Default.Key, IconTeal),
+                    TabSpec("Audit Logs", Icons.Default.Terminal, IconRed)
+                )
+
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = JellyfinCardBackground,
-                    contentColor = JellyfinCyan,
+                    contentColor = tabSpecs[selectedTab.coerceIn(0, tabSpecs.size - 1)].color,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = JellyfinCyan
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab.coerceIn(0, tabPositions.size - 1)]),
+                            color = tabSpecs[selectedTab.coerceIn(0, tabSpecs.size - 1)].color
                         )
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                 ) {
-                    tabs.forEachIndexed { index, title ->
+                    tabSpecs.forEachIndexed { index, spec ->
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
                             text = {
-                                Text(
-                                    text = title,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selectedTab == index) JellyfinCyan else TextMuted
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = spec.icon,
+                                        contentDescription = null,
+                                        tint = if (selectedTab == index) spec.color else TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = spec.title,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selectedTab == index) spec.color else TextMuted
+                                    )
+                                }
                             }
                         )
                     }
@@ -493,7 +604,7 @@ fun SecurityScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 4. Tab Content Views
+                // 5. Selected Admin Sub-Area Content View
                 when (selectedTab) {
                     0 -> AdminUsersTab(
                         usersList = usersList,
@@ -518,7 +629,13 @@ fun SecurityScreen(
                             }
                         }
                     )
-                    3 -> AdminSystemTab(
+                    3 -> AdminTranscoderTab(
+                        onPurgeTranscode = { actionNotice = "NVENC Transcode cache flushed and reset." }
+                    )
+                    4 -> AdminApiKeysTab(
+                        onGenerateKey = { actionNotice = "New REST API Key generated: cinode_api_key_8892" }
+                    )
+                    5 -> AdminSystemTab(
                         activeServer = activeServer,
                         activityLogs = activityLogs,
                         onPurgeCache = { actionNotice = "Server image & transcode cache purged." }
@@ -643,22 +760,36 @@ private fun MetricCard(
         modifier = modifier
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(accentColor.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
+                Icon(imageVector = icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(16.dp))
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(text = title, color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                Text(text = value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = TextMuted,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = value,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -967,6 +1098,233 @@ private fun AdminSystemTab(
                 Spacer(modifier = Modifier.height(10.dp))
                 displayLogs.forEach { log ->
                     Text(text = log, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 3.dp))
+                }
+            }
+        }
+    }
+}
+
+private data class AdminMenuItem(
+    val title: String,
+    val description: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color,
+    val tabIndex: Int
+)
+
+private data class TabSpec(
+    val title: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color
+)
+
+@Composable
+private fun AdminNavMenuCard(
+    item: AdminMenuItem,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TvFocusableCard(
+        onClick = onSelect,
+        testTag = "admin_menu_card_${item.tabIndex}",
+        modifier = modifier
+    ) {
+        Surface(
+            color = if (isSelected) item.color.copy(alpha = 0.22f) else JellyfinSurfaceVariant,
+            shape = RoundedCornerShape(12.dp),
+            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, item.color) else null
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(item.color.copy(alpha = 0.25f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(item.icon, contentDescription = null, tint = item.color, modifier = Modifier.size(18.dp))
+                    }
+                    if (isSelected) {
+                        Surface(
+                            color = item.color,
+                            shape = CircleShape,
+                            modifier = Modifier.size(8.dp)
+                        ) {}
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = item.title,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = item.description,
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminTranscoderTab(
+    onPurgeTranscode: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Hardware Acceleration & Transcode Pipeline", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // CPU Load Card
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Speed, contentDescription = null, tint = IconRed, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("CPU LOAD", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text("18%", color = IconGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                        Box(modifier = Modifier.fillMaxWidth(0.18f).height(6.dp).background(IconGreen))
+                    }
+                }
+            }
+
+            // RAM Usage Card
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Memory, contentDescription = null, tint = IconPurple, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("RAM USAGE", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text("4.2 / 16 GB", color = IconPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                        Box(modifier = Modifier.fillMaxWidth(0.26f).height(6.dp).background(IconPurple))
+                    }
+                }
+            }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // NVENC GPU Card
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = IconYellow, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("GPU ENCODER", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text("NVIDIA NVENC", color = IconYellow, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("H.264 / H.265 / AV1 Hardware Decode Enabled", color = TextPrimary, fontSize = 11.sp)
+                }
+            }
+
+            // Transcode Buffer Card
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Storage, contentDescription = null, tint = IconTeal, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("CACHE TEMP", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text("12.4 GB", color = IconTeal, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Location: /var/lib/cinode/transcode-cache", color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
+
+        TvFocusableCard(onClick = onPurgeTranscode, testTag = "btn_purge_transcode_cache") {
+            Surface(color = IconAmber, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.CleaningServices, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Flush Active Transcode Temp Buffers", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminApiKeysTab(
+    onGenerateKey: () -> Unit
+) {
+    val sampleKeys = listOf(
+        Triple("cinode_api_key_live_99", "Android Client Integration", "Full Admin Scope"),
+        Triple("cinode_api_key_read_42", "Home Assistant Automation", "Read Only Scope"),
+        Triple("cinode_api_key_sync_17", "Metadata Scraper Bot", "Library Write Scope")
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("REST API Keys & Authentication Tokens", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+            TvFocusableCard(onClick = onGenerateKey, testTag = "btn_generate_api_key") {
+                Surface(color = IconTeal, shape = RoundedCornerShape(10.dp)) {
+                    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("New API Token", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        sampleKeys.forEach { (keyToken, appName, scope) ->
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(IconTeal.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Key, contentDescription = null, tint = IconTeal, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(appName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Token: ${keyToken.take(16)}...", color = TextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+
+                    Surface(color = IconIndigo.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
+                        Text(scope, color = IconIndigo, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    }
                 }
             }
         }

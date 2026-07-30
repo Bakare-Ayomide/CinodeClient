@@ -121,7 +121,7 @@ fun ServerConnectScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Connect to Jellyfin Server",
+                            text = "Connect to Cinode Server",
                             style = MaterialTheme.typography.headlineSmall,
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold

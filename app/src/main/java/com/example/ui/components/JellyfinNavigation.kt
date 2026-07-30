@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,6 +58,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.DeviceMode
+import com.example.ui.theme.IconAmber
+import com.example.ui.theme.IconBlue
+import com.example.ui.theme.IconCyan
+import com.example.ui.theme.IconGreen
+import com.example.ui.theme.IconLime
+import com.example.ui.theme.IconOrange
+import com.example.ui.theme.IconPink
+import com.example.ui.theme.IconPurple
+import com.example.ui.theme.IconRed
+import com.example.ui.theme.IconTeal
+import com.example.ui.theme.IconYellow
 import com.example.ui.theme.JellyfinBackground
 import com.example.ui.theme.JellyfinCardBackground
 import com.example.ui.theme.JellyfinRed
@@ -64,6 +76,22 @@ import com.example.ui.theme.JellyfinSurface
 import com.example.ui.theme.JellyfinSurfaceVariant
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
+
+fun NavDestination.getIconColor(): Color {
+    return when (this) {
+        NavDestination.HOME -> IconBlue
+        NavDestination.MOVIES -> IconYellow
+        NavDestination.TV_SHOWS -> IconOrange
+        NavDestination.SEARCH -> IconCyan
+        NavDestination.FAVORITES -> IconPink
+        NavDestination.DOWNLOADS -> IconGreen
+        NavDestination.PROFILE -> IconTeal
+        NavDestination.SECURITY -> IconRed
+        NavDestination.SETTINGS -> IconPurple
+        NavDestination.AUTH -> IconAmber
+        NavDestination.ONBOARDING -> IconLime
+    }
+}
 
 enum class NavDestination(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
@@ -80,7 +108,7 @@ enum class NavDestination(val title: String, val icon: ImageVector) {
 }
 
 @Composable
-fun JellyfinTopBar(
+fun CinodeTopBar(
     activeServerName: String,
     deviceMode: DeviceMode,
     isTvRemoteVisible: Boolean,
@@ -99,7 +127,7 @@ fun JellyfinTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -121,7 +149,7 @@ fun JellyfinTopBar(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(2.dp))
 
                 Box(
                     modifier = Modifier
@@ -131,20 +159,20 @@ fun JellyfinTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "J",
+                        text = "C",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Column(
                     modifier = Modifier.clickable { onOpenDrawer() }
                 ) {
                     Text(
-                        text = "JELLYFIN",
+                        text = "CINODE",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary,
                         fontWeight = FontWeight.Black,
@@ -179,11 +207,13 @@ fun JellyfinTopBar(
                 }
             }
 
-            // Search Bar (Compact)
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Search Bar (Responsive Width)
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("Search...", color = TextMuted, fontSize = 12.sp) },
+                placeholder = { Text("Search...", color = TextMuted, fontSize = 11.sp) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -203,10 +233,13 @@ fun JellyfinTopBar(
                 ),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier
-                    .width(150.dp)
-                    .height(42.dp)
+                    .weight(1f, fill = false)
+                    .widthIn(min = 80.dp, max = 160.dp)
+                    .height(40.dp)
                     .testTag("topbar_search_input")
             )
+
+            Spacer(modifier = Modifier.width(6.dp))
 
             // Mode & Remote controls
             Row(
@@ -224,7 +257,7 @@ fun JellyfinTopBar(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
                         ) {
                             Icon(
                                 imageVector = if (deviceMode == DeviceMode.SMART_TV_DPAD) Icons.Default.Tv else Icons.Default.TvOff,
@@ -232,18 +265,11 @@ fun JellyfinTopBar(
                                 tint = if (deviceMode == DeviceMode.SMART_TV_DPAD) JellyfinRed else TextMuted,
                                 modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (deviceMode == DeviceMode.SMART_TV_DPAD) "TV" else "Phone",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
                 // On-Screen Remote Toggle
                 TvFocusableCard(
@@ -270,11 +296,38 @@ fun JellyfinTopBar(
     }
 }
 
+@Composable
+fun JellyfinTopBar(
+    activeServerName: String,
+    deviceMode: DeviceMode,
+    isTvRemoteVisible: Boolean,
+    onToggleDeviceMode: () -> Unit,
+    onToggleTvRemote: () -> Unit,
+    onOpenServerConnect: () -> Unit,
+    onOpenDrawer: () -> Unit = {},
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    CinodeTopBar(
+        activeServerName = activeServerName,
+        deviceMode = deviceMode,
+        isTvRemoteVisible = isTvRemoteVisible,
+        onToggleDeviceMode = onToggleDeviceMode,
+        onToggleTvRemote = onToggleTvRemote,
+        onOpenServerConnect = onOpenServerConnect,
+        onOpenDrawer = onOpenDrawer,
+        searchQuery = searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
+        modifier = modifier
+    )
+}
+
 /**
  * Sidebar Navigation Drawer matching screenshot design
  */
 @Composable
-fun JellyfinDrawerContent(
+fun CinodeDrawerContent(
     currentDestination: NavDestination,
     activeServerName: String = "Demo Server",
     isAdmin: Boolean = false,
@@ -312,7 +365,7 @@ fun JellyfinDrawerContent(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) JellyfinRed else Color.Transparent)
+                                .background(if (isSelected) destination.getIconColor() else destination.getIconColor().copy(alpha = 0.15f))
                                 .clickable {
                                     onNavigate(destination)
                                     onCloseDrawer()
@@ -320,11 +373,7 @@ fun JellyfinDrawerContent(
                                 .testTag("drawer_icon_${destination.name.lowercase()}"),
                             contentAlignment = Alignment.Center
                         ) {
-                            val iconColor = when {
-                                isSelected -> Color.White
-                                destination == NavDestination.SECURITY -> JellyfinRed
-                                else -> Color.White.copy(alpha = 0.65f)
-                            }
+                            val iconColor = if (isSelected) Color.White else destination.getIconColor()
                             Icon(
                                 imageVector = destination.icon,
                                 contentDescription = destination.title,
@@ -389,7 +438,28 @@ fun JellyfinDrawerContent(
 }
 
 @Composable
-fun JellyfinTvNavRail(
+fun JellyfinDrawerContent(
+    currentDestination: NavDestination,
+    activeServerName: String = "Demo Server",
+    isAdmin: Boolean = false,
+    onNavigate: (NavDestination) -> Unit = {},
+    onOpenServerConnect: () -> Unit = {},
+    onCloseDrawer: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    CinodeDrawerContent(
+        currentDestination = currentDestination,
+        activeServerName = activeServerName,
+        isAdmin = isAdmin,
+        onNavigate = onNavigate,
+        onOpenServerConnect = onOpenServerConnect,
+        onCloseDrawer = onCloseDrawer,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun CinodeTvNavRail(
     currentDestination: NavDestination,
     isAdmin: Boolean = false,
     onNavigate: (NavDestination) -> Unit,
@@ -420,16 +490,12 @@ fun JellyfinTvNavRail(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) JellyfinRed else Color.Transparent)
+                            .background(if (isSelected) destination.getIconColor() else destination.getIconColor().copy(alpha = 0.15f))
                             .clickable { onNavigate(destination) }
                             .testTag("rail_icon_${destination.name.lowercase()}"),
                         contentAlignment = Alignment.Center
                     ) {
-                        val iconColor = when {
-                            isSelected -> Color.White
-                            destination == NavDestination.SECURITY -> JellyfinRed
-                            else -> Color.White.copy(alpha = 0.65f)
-                        }
+                        val iconColor = if (isSelected) Color.White else destination.getIconColor()
                         Icon(
                             imageVector = destination.icon,
                             contentDescription = destination.title,
@@ -465,5 +531,20 @@ fun JellyfinTvNavRail(
             )
         }
     }
+}
+
+@Composable
+fun JellyfinTvNavRail(
+    currentDestination: NavDestination,
+    isAdmin: Boolean = false,
+    onNavigate: (NavDestination) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    CinodeTvNavRail(
+        currentDestination = currentDestination,
+        isAdmin = isAdmin,
+        onNavigate = onNavigate,
+        modifier = modifier
+    )
 }
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -103,7 +104,7 @@ fun OnboardingScreen(
 
     val pages = listOf(
         OnboardingPage(
-            title = "Welcome to Jellyfin Cinema",
+            title = "Welcome to Cinode Cinema",
             subtitle = "Stream your entire personal movie and TV collection in pristine 4K HDR with spatial surround audio across all your devices.",
             icon = Icons.Default.Movie,
             badge = "PERSONAL MEDIA HUB",
@@ -341,7 +342,7 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "JELLYFIN MEDIA SERVER",
+                text = "CINODE MEDIA SERVER",
                 color = JellyfinCyan,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 12.sp,
@@ -351,7 +352,7 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = if (activeTab == AuthTab.LOGIN) "Sign In to Your Server" else "Create New Jellyfin Account",
+                text = if (activeTab == AuthTab.LOGIN) "Sign In to Your Server" else "Create New Cinode Account",
                 color = TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp
@@ -372,7 +373,8 @@ fun AuthScreen(
                 color = JellyfinSurfaceVariant,
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
-                    .width(300.dp)
+                    .fillMaxWidth(0.9f)
+                    .widthIn(max = 300.dp)
                     .height(46.dp)
             ) {
                 Row(

@@ -1,6 +1,6 @@
 {
-  "name": "Jellyfin Client",
-  "description": "A Jellyfin client application for Android phones and Smart TVs with media streaming, library browser, and D-Pad remote navigation support.",
+  "name": "Cinode",
+  "description": "Cinode media client application for Android phones and Smart TVs with media streaming, library browser, and D-Pad remote navigation support.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

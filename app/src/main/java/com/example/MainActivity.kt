@@ -24,6 +24,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.DeviceMode
 import com.example.ui.JellyfinUiState
 import com.example.ui.JellyfinViewModel
+import com.example.ui.components.CinodeDrawerContent
+import com.example.ui.components.CinodeTopBar
+import com.example.ui.components.CinodeTvNavRail
 import com.example.ui.components.JellyfinDrawerContent
 import com.example.ui.components.JellyfinTopBar
 import com.example.ui.components.JellyfinTvNavRail
@@ -39,6 +42,7 @@ import com.example.ui.screens.PlayerScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.ServerConnectScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.theme.CinodeTheme
 import com.example.ui.theme.JellyfinBackground
 import com.example.ui.theme.JellyfinTheme
 import kotlinx.coroutines.launch
@@ -51,7 +55,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JellyfinTheme {
+            CinodeTheme {
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 val savedServers by viewModel.savedServers.collectAsStateWithLifecycle()
                 val continueWatching by viewModel.continueWatching.collectAsStateWithLifecycle()
@@ -62,7 +66,7 @@ class MainActivity : ComponentActivity() {
                 val series by viewModel.series.collectAsStateWithLifecycle()
                 val allDownloads by viewModel.allDownloads.collectAsStateWithLifecycle()
 
-                JellyfinAppContent(
+                CinodeAppContent(
                     uiState = uiState,
                     savedServers = savedServers,
                     continueWatching = continueWatching,
@@ -80,7 +84,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun JellyfinAppContent(
+fun CinodeAppContent(
     uiState: JellyfinUiState,
     savedServers: List<com.example.data.model.JellyfinServer>,
     continueWatching: List<com.example.data.db.MediaProgressEntity>,
@@ -161,7 +165,7 @@ fun JellyfinAppContent(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            JellyfinDrawerContent(
+            CinodeDrawerContent(
                 currentDestination = uiState.currentDestination,
                 isAdmin = isAdminUser,
                 onNavigate = { dest ->
@@ -179,7 +183,7 @@ fun JellyfinAppContent(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Top Bar
-                JellyfinTopBar(
+                CinodeTopBar(
                     activeServerName = uiState.activeServer?.name ?: "Demo Server",
                     deviceMode = uiState.deviceMode,
                     isTvRemoteVisible = uiState.isTvRemoteVisible,
@@ -197,7 +201,7 @@ fun JellyfinAppContent(
 
                 if (isWideScreen) {
                     Row(modifier = Modifier.weight(1f)) {
-                        JellyfinTvNavRail(
+                        CinodeTvNavRail(
                             currentDestination = uiState.currentDestination,
                             isAdmin = isAdminUser,
                             onNavigate = { dest -> viewModel.navigateTo(dest) }

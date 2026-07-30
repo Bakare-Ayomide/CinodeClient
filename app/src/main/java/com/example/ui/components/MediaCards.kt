@@ -61,9 +61,7 @@ fun MediaPosterCard(
     TvFocusableCard(
         onClick = onClick,
         shape = RectangleShape,
-        modifier = modifier
-            .width(140.dp)
-            .aspectRatio(2f / 3f),
+        modifier = modifier.aspectRatio(2f / 3f),
         testTag = "poster_card_${item.id}"
     ) { isFocused ->
         Box(modifier = Modifier.fillMaxSize()) {

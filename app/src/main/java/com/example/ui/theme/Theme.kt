@@ -23,7 +23,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun JellyfinTheme(
+fun CinodeTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
@@ -31,4 +31,11 @@ fun JellyfinTheme(
         typography = Typography,
         content = content
     )
+}
+
+@Composable
+fun JellyfinTheme(
+    content: @Composable () -> Unit
+) {
+    CinodeTheme(content = content)
 }

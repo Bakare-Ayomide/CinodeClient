@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Jellyfin Client"
+rootProject.name = "Cinode"
 
 include(":app")

@@ -115,7 +115,12 @@ fun JellyfinAppContent(
     // 3. Fullscreen Auth Screen Flow Mode (Login & Signup)
     if (uiState.showAuthFlow || uiState.currentDestination == NavDestination.AUTH || !uiState.isAuthenticated) {
         AuthScreen(
-            onAuthSuccess = { email, name -> viewModel.login(email, name) },
+            onLoginSubmit = { user, pass, url, callback ->
+                viewModel.loginWithServer(user, pass, url, callback)
+            },
+            onSignupSubmit = { name, email, pass, url, callback ->
+                viewModel.signupWithServer(name, email, pass, url, callback)
+            },
             onGuestLogin = { viewModel.loginGuest() },
             onOpenOnboarding = { viewModel.openOnboarding() }
         )
@@ -146,12 +151,19 @@ fun JellyfinAppContent(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    val adminEnvUser = com.example.BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+    val isAdminUser = uiState.currentUserName.equals(adminEnvUser, ignoreCase = true) ||
+            uiState.currentUserEmail.startsWith(adminEnvUser, ignoreCase = true) ||
+            uiState.currentUserName.contains("duwit", ignoreCase = true) ||
+            uiState.currentUserEmail.contains("duwit", ignoreCase = true)
+
     // 3. Main Jellyfin Client Application with Sideways Drawer Navigation
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             JellyfinDrawerContent(
                 currentDestination = uiState.currentDestination,
+                isAdmin = isAdminUser,
                 onNavigate = { dest ->
                     viewModel.navigateTo(dest)
                     scope.launch { drawerState.close() }
@@ -187,6 +199,7 @@ fun JellyfinAppContent(
                     Row(modifier = Modifier.weight(1f)) {
                         JellyfinTvNavRail(
                             currentDestination = uiState.currentDestination,
+                            isAdmin = isAdminUser,
                             onNavigate = { dest -> viewModel.navigateTo(dest) }
                         )
 
@@ -357,6 +370,16 @@ fun MainScreenContent(
                 deviceMode = uiState.deviceMode,
                 onToggleDeviceMode = { viewModel.toggleDeviceMode() },
                 onOpenServerConnect = { viewModel.openServerConnectModal() }
+            )
+        }
+
+        NavDestination.SECURITY -> {
+            com.example.ui.screens.SecurityScreen(
+                currentUserName = uiState.currentUserName,
+                currentUserEmail = uiState.currentUserEmail,
+                activeServer = uiState.activeServer,
+                viewModel = viewModel,
+                onNavigateToAuth = { viewModel.openAuth() }
             )
         }
 

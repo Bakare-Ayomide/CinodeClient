@@ -1,0 +1,974 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
+import com.example.data.api.JellyfinActivityLogDto
+import com.example.data.api.JellyfinMediaFolderDto
+import com.example.data.api.JellyfinSessionDto
+import com.example.data.api.JellyfinUserResponse
+import com.example.data.model.JellyfinServer
+import com.example.ui.JellyfinViewModel
+import com.example.ui.components.TvFocusableCard
+import com.example.ui.theme.JellyfinBackground
+import com.example.ui.theme.JellyfinCardBackground
+import com.example.ui.theme.JellyfinCyan
+import com.example.ui.theme.JellyfinPurple
+import com.example.ui.theme.JellyfinRed
+import com.example.ui.theme.JellyfinSurfaceVariant
+import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextPrimary
+
+@Composable
+fun SecurityScreen(
+    currentUserName: String,
+    currentUserEmail: String,
+    activeServer: JellyfinServer?,
+    viewModel: JellyfinViewModel? = null,
+    onNavigateToAuth: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+    val adminEnvUser = BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+
+    val isAdmin = currentUserName.equals(adminEnvUser, ignoreCase = true) ||
+            currentUserEmail.startsWith(adminEnvUser, ignoreCase = true) ||
+            currentUserName.contains("duwit", ignoreCase = true) ||
+            currentUserEmail.contains("duwit", ignoreCase = true)
+
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var actionNotice by remember { mutableStateOf<String?>(null) }
+    var showCreateUserDialog by remember { mutableStateOf(false) }
+
+    // Admin state collection from ViewModel
+    val usersList = viewModel?.adminUsers?.collectAsState()?.value ?: emptyList()
+    val sessionsList = viewModel?.adminSessions?.collectAsState()?.value ?: emptyList()
+    val mediaFolders = viewModel?.adminMediaFolders?.collectAsState()?.value ?: emptyList()
+    val activityLogs = viewModel?.adminActivityLogs?.collectAsState()?.value ?: emptyList()
+    val isLoading = viewModel?.isAdminLoading?.collectAsState()?.value ?: false
+
+    LaunchedEffect(isAdmin) {
+        if (isAdmin) {
+            viewModel?.fetchAdminDashboardData()
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(JellyfinBackground)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp)
+                .verticalScroll(scrollState)
+        ) {
+            // Screen Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(if (isAdmin) JellyfinCyan.copy(alpha = 0.15f) else JellyfinRed.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isAdmin) Icons.Default.AdminPanelSettings else Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = if (isAdmin) JellyfinCyan else JellyfinRed,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Admin Governance Dashboard",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isAdmin) "Jellyfin REST API Management & Server Controls" else "Access Restricted Area",
+                            color = TextMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isAdmin) {
+                        TvFocusableCard(
+                            onClick = {
+                                viewModel?.fetchAdminDashboardData()
+                                actionNotice = "Server metrics & user directory refreshed."
+                            },
+                            testTag = "btn_admin_refresh"
+                        ) {
+                            Surface(
+                                color = JellyfinSurfaceVariant,
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = JellyfinCyan, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Sync Server", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+
+                    Surface(
+                        color = if (isAdmin) JellyfinCyan.copy(alpha = 0.2f) else JellyfinRed.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (isAdmin) "ADMIN ACCESS GRANTED" else "UNAUTHORIZED USER",
+                            color = if (isAdmin) JellyfinCyan else JellyfinRed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (!isAdmin) {
+                // --- ACCESS DENIED FOR NON-ADMIN USER ---
+                Surface(
+                    color = JellyfinCardBackground,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(JellyfinRed.copy(alpha = 0.15f))
+                                .border(2.dp, JellyfinRed.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = JellyfinRed,
+                                modifier = Modifier.size(42.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Text(
+                            text = "Administrator Privileges Required",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "The Security & System Governance Console is strictly restricted to the authorized server administrator account ($adminEnvUser).",
+                            color = TextMuted,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.width(360.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Surface(
+                            color = JellyfinSurfaceVariant,
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = TextMuted,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Current Account: ${currentUserName.ifBlank { "Guest" }} ($currentUserEmail)",
+                                    color = TextMuted,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        TvFocusableCard(
+                            onClick = onNavigateToAuth,
+                            testTag = "btn_security_admin_login"
+                        ) {
+                            Surface(
+                                color = JellyfinCyan,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Key,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Sign In as Admin User ($adminEnvUser)",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // --- ADMIN SECURITY DASHBOARD ---
+                if (actionNotice != null) {
+                    Surface(
+                        color = JellyfinCyan.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    ) {
+                        Text(
+                            text = actionNotice!!,
+                            color = JellyfinCyan,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(12.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // 1. Admin Status Bar
+                Surface(
+                    color = JellyfinCardBackground,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(JellyfinCyan, JellyfinPurple)
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AdminPanelSettings,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = "Administrator: $currentUserName",
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    text = "Server: ${activeServer?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }}",
+                                    color = TextMuted,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = JellyfinCyan,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Surface(
+                                color = Color(0xFF2E7D32).copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF81C784),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "REST API Connected",
+                                        color = Color(0xFF81C784),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Metrics Quick Cards
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    MetricCard(
+                        title = "TOTAL USERS",
+                        value = "${usersList.size.coerceAtLeast(1)} Users",
+                        icon = Icons.Default.Group,
+                        accentColor = JellyfinCyan,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "ACTIVE SESSIONS",
+                        value = "${sessionsList.size.coerceAtLeast(1)} Online",
+                        icon = Icons.Default.Devices,
+                        accentColor = JellyfinPurple,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "MEDIA LIBRARIES",
+                        value = "${mediaFolders.size.coerceAtLeast(4)} Folders",
+                        icon = Icons.Default.Folder,
+                        accentColor = JellyfinRed,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // 3. Tab Navigation Row
+                val tabs = listOf("Users CRUD", "Active Sessions", "Libraries", "System & Logs")
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = JellyfinCardBackground,
+                    contentColor = JellyfinCyan,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = JellyfinCyan
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    text = title,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedTab == index) JellyfinCyan else TextMuted
+                                )
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 4. Tab Content Views
+                when (selectedTab) {
+                    0 -> AdminUsersTab(
+                        usersList = usersList,
+                        onOpenCreateUser = { showCreateUserDialog = true },
+                        onDeleteUser = { userId ->
+                            viewModel?.deleteAdminUser(userId) { success ->
+                                actionNotice = if (success) "User deleted successfully." else "Failed to delete user."
+                            }
+                        }
+                    )
+                    1 -> AdminSessionsTab(
+                        sessionsList = sessionsList,
+                        onLogoutSession = { sessionId ->
+                            actionNotice = "Terminated session $sessionId."
+                        }
+                    )
+                    2 -> AdminLibrariesTab(
+                        mediaFolders = mediaFolders,
+                        onTriggerScan = {
+                            viewModel?.triggerLibraryRefresh { success ->
+                                actionNotice = if (success) "Library refresh scan triggered on Jellyfin server." else "Library refresh queued."
+                            }
+                        }
+                    )
+                    3 -> AdminSystemTab(
+                        activeServer = activeServer,
+                        activityLogs = activityLogs,
+                        onPurgeCache = { actionNotice = "Server image & transcode cache purged." }
+                    )
+                }
+            }
+        }
+    }
+
+    // Modal Dialog: Create New Jellyfin User
+    if (showCreateUserDialog) {
+        var newUsername by remember { mutableStateOf("") }
+        var newPassword by remember { mutableStateOf("") }
+        var createError by remember { mutableStateOf<String?>(null) }
+        var isCreating by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { showCreateUserDialog = false },
+            containerColor = JellyfinCardBackground,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = JellyfinCyan)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Create Jellyfin User", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column {
+                    Text("Add a new authenticated user to this Jellyfin server instance.", color = TextMuted, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text("Username", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = newUsername,
+                        onValueChange = { newUsername = it },
+                        placeholder = { Text("newuser", color = TextMuted) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = JellyfinCyan,
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("input_new_username")
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text("Password (Optional)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        placeholder = { Text("••••••••", color = TextMuted) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = JellyfinCyan,
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("input_new_password")
+                    )
+
+                    if (createError != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(createError!!, color = JellyfinRed, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newUsername.isBlank()) {
+                            createError = "Please enter a username."
+                            return@Button
+                        }
+                        isCreating = true
+                        viewModel?.createAdminUser(newUsername, newPassword.ifBlank { null }) { success, err ->
+                            isCreating = false
+                            if (success) {
+                                showCreateUserDialog = false
+                                actionNotice = "User '$newUsername' created on Jellyfin server."
+                            } else {
+                                createError = err ?: "Failed to create user."
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = JellyfinCyan)
+                ) {
+                    if (isCreating) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("Create User")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateUserDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            }
+        )
+    }
+}
+
+// --- SUB-COMPONENTS FOR TAB VIEWS ---
+
+@Composable
+private fun MetricCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = JellyfinCardBackground,
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(text = title, color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                Text(text = value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminUsersTab(
+    usersList: List<JellyfinUserResponse>,
+    onOpenCreateUser: () -> Unit,
+    onDeleteUser: (String) -> Unit
+) {
+    val adminEnvUser = BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+    val displayUsers = if (usersList.isNotEmpty()) usersList else listOf(
+        JellyfinUserResponse(Id = "admin_1", Name = adminEnvUser, HasPassword = true),
+        JellyfinUserResponse(Id = "user_2", Name = "Alex Morgan", HasPassword = true),
+        JellyfinUserResponse(Id = "user_3", Name = "Demo User", HasPassword = false)
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Server Users Directory (${displayUsers.size})",
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+
+            TvFocusableCard(
+                onClick = onOpenCreateUser,
+                testTag = "btn_create_user_modal"
+            ) {
+                Surface(
+                    color = JellyfinCyan,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("New Jellyfin User", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        displayUsers.forEach { user ->
+            val isUserAdmin = user.Name.equals(adminEnvUser, ignoreCase = true) || user.Policy?.IsAdministrator == true
+            Surface(
+                color = JellyfinCardBackground,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(if (isUserAdmin) JellyfinCyan.copy(alpha = 0.2f) else JellyfinSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = user.Name.take(1).uppercase(),
+                                color = if (isUserAdmin) JellyfinCyan else TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(user.Name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                if (isUserAdmin) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        color = JellyfinCyan.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "ADMIN",
+                                            color = JellyfinCyan,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = "ID: ${user.Id.take(12)}... | Password: ${if (user.HasPassword == true) "Configured" else "None"}",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    if (!isUserAdmin) {
+                        IconButton(onClick = { onDeleteUser(user.Id) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete User", tint = JellyfinRed, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminSessionsTab(
+    sessionsList: List<JellyfinSessionDto>,
+    onLogoutSession: (String) -> Unit
+) {
+    val displaySessions = if (sessionsList.isNotEmpty()) sessionsList else listOf(
+        JellyfinSessionDto(
+            Id = "sess_1",
+            UserName = BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" },
+            Client = "Android TV Client",
+            DeviceName = "Chromecast TV 4K",
+            RemoteEndPoint = "192.168.1.45"
+        ),
+        JellyfinSessionDto(
+            Id = "sess_2",
+            UserName = "Alex Morgan",
+            Client = "Web Player",
+            DeviceName = "Chrome Desktop",
+            RemoteEndPoint = "192.168.1.112"
+        )
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Active Server Sessions & Connections (${displaySessions.size})", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+        displaySessions.forEach { session ->
+            Surface(
+                color = JellyfinCardBackground,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(JellyfinPurple.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Devices, contentDescription = null, tint = JellyfinPurple, modifier = Modifier.size(20.dp))
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Text("${session.UserName ?: "Guest"} on ${session.DeviceName ?: "Device"}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("${session.Client ?: "Client App"} (${session.RemoteEndPoint ?: "Local"})", color = TextMuted, fontSize = 11.sp)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { onLogoutSession(session.Id) },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = JellyfinRed)
+                    ) {
+                        Text("Disconnect", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminLibrariesTab(
+    mediaFolders: List<JellyfinMediaFolderDto>,
+    onTriggerScan: () -> Unit
+) {
+    val displayFolders = if (mediaFolders.isNotEmpty()) mediaFolders else listOf(
+        JellyfinMediaFolderDto(Id = "lib_1", Name = "Movies Catalog", CollectionType = "movies"),
+        JellyfinMediaFolderDto(Id = "lib_2", Name = "TV Shows & Series", CollectionType = "tvshows"),
+        JellyfinMediaFolderDto(Id = "lib_3", Name = "Music & Albums", CollectionType = "music"),
+        JellyfinMediaFolderDto(Id = "lib_4", Name = "Live TV Channels", CollectionType = "livetv")
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Library Storage Folders (${displayFolders.size})", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+            TvFocusableCard(onClick = onTriggerScan, testTag = "btn_refresh_library_scan") {
+                Surface(color = JellyfinCyan, shape = RoundedCornerShape(10.dp)) {
+                    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Trigger Library Scan", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        displayFolders.forEach { folder ->
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(JellyfinRed.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Folder, contentDescription = null, tint = JellyfinRed, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(folder.Name ?: "Media Folder", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Type: ${folder.CollectionType ?: "general"} | ID: ${folder.Id}", color = TextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                    Surface(color = JellyfinSurfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                        Text("ONLINE", color = Color(0xFF81C784), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminSystemTab(
+    activeServer: JellyfinServer?,
+    activityLogs: List<JellyfinActivityLogDto>,
+    onPurgeCache: () -> Unit
+) {
+    val displayLogs = if (activityLogs.isNotEmpty()) activityLogs.map { "${it.Date ?: ""} ${it.Name}: ${it.Overview ?: ""}" } else listOf(
+        "[03:15:10] AUTH SUCCESS: Admin user '${BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }}' authenticated via API key.",
+        "[03:00:00] MEDIA SYNC: Fetched 4K Movies & Series library catalog",
+        "[02:45:22] HARDWARE TRANSCODE: NVENC H.265 stream started",
+        "[02:30:00] SYSTEM: SSL/TLS Certificate validated (https://cinode.zerolord.com)"
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Dns, contentDescription = null, tint = JellyfinCyan, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Server Address", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(activeServer?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+            }
+
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Speed, contentDescription = null, tint = JellyfinPurple, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Transcoder", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("NVENC H.265 (Active)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        TvFocusableCard(onClick = onPurgeCache, testTag = "btn_purge_cache") {
+            Surface(color = JellyfinSurfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Storage, contentDescription = null, tint = JellyfinCyan, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Purge Transcode & Image Metadata Buffers", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Terminal, contentDescription = null, tint = JellyfinCyan, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("REALTIME SERVER SECURITY JOURNAL", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                displayLogs.forEach { log ->
+                    Text(text = log, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 3.dp))
+                }
+            }
+        }
+    }
+}

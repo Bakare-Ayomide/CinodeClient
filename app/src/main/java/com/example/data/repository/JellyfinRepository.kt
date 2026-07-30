@@ -229,6 +229,191 @@ class JellyfinRepository(
         }
     }
 
+    suspend fun signupUser(
+        name: String,
+        email: String,
+        password: String,
+        serverUrl: String
+    ): Result<JellyfinServer> {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configAdminUser = com.example.BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+            val configAdminPass = com.example.BuildConfig.JELLYFIN_ADMIN_PASS.ifEmpty { "@f33rinimi" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+
+            val rawTargetUrl = if (serverUrl.isBlank()) primaryServerUrl else serverUrl
+            val formattedUrl = if (rawTargetUrl.endsWith("/")) rawTargetUrl else "$rawTargetUrl/"
+            val username = name.ifBlank { email.takeWhile { it != '@' } }.ifBlank { "User" }
+
+            // 1. Authenticate with admin account to get admin token
+            var adminToken = configApiKey
+            try {
+                val adminAuthUrl = "${formattedUrl}Users/AuthenticateByName"
+                val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin_client\", Version=\"1.0.0\""
+                val adminAuthResult = apiService.authenticateByName(
+                    url = adminAuthUrl,
+                    authHeader = authHeader,
+                    request = AuthenticateByNameRequest(Username = configAdminUser, Pw = configAdminPass)
+                )
+                adminAuthResult.AccessToken?.let { adminToken = it }
+            } catch (e: Exception) {
+                // Ignore failure to authenticate admin; continue with api key
+            }
+
+            // 2. Call Jellyfin API /Users/New with admin authorization header / api_key
+            try {
+                val createUserUrl = "${formattedUrl}Users/New"
+                val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_android_client\", Version=\"1.0.0\", Token=\"$adminToken\""
+                apiService.createUserByName(
+                    url = createUserUrl,
+                    authHeader = authHeader,
+                    apiKey = adminToken,
+                    request = com.example.data.api.CreateUserByNameRequest(Name = username, Password = password)
+                )
+            } catch (e: Exception) {
+                // User may already exist or creation requires user password setup step
+            }
+
+            // 3. Connect as the newly signed up user or fallback to server session
+            connectToServer(formattedUrl, username, password)
+        } catch (e: Exception) {
+            connectToServer(serverUrl, name, password)
+        }
+    }
+
+    suspend fun getUsersList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinUserResponse> {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            apiService.getUsers(
+                url = "${baseUrl}Users",
+                authHeader = authHeader,
+                apiKey = token
+            )
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun createNewUser(name: String, pass: String?, activeServer: JellyfinServer? = null): Result<com.example.data.api.JellyfinUserResponse> {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            val res = apiService.createUserByName(
+                url = "${baseUrl}Users/New",
+                authHeader = authHeader,
+                apiKey = token,
+                request = com.example.data.api.CreateUserByNameRequest(Name = name, Password = pass)
+            )
+            Result.success(res)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteUser(userId: String, activeServer: JellyfinServer? = null): Boolean {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            val res = apiService.deleteUser(
+                url = "${baseUrl}Users/$userId",
+                authHeader = authHeader,
+                apiKey = token
+            )
+            res.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun getActiveSessionsList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinSessionDto> {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            apiService.getSessions(
+                url = "${baseUrl}Sessions",
+                authHeader = authHeader,
+                apiKey = token
+            )
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun triggerLibraryScan(activeServer: JellyfinServer? = null): Boolean {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            val res = apiService.refreshLibrary(
+                url = "${baseUrl}Library/Refresh",
+                authHeader = authHeader,
+                apiKey = token
+            )
+            res.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun getMediaFoldersList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinMediaFolderDto> {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            val res = apiService.getMediaFolders(
+                url = "${baseUrl}Library/MediaFolders",
+                authHeader = authHeader,
+                apiKey = token
+            )
+            res.Items
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun getActivityLogsList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinActivityLogDto> {
+        return try {
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
+            val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
+            val authHeader = "MediaBrowser Client=\"Jellyfin Android Client\", Device=\"Android\", DeviceId=\"jellyfin_admin\", Version=\"1.0.0\", Token=\"$token\""
+
+            val res = apiService.getActivityLogs(
+                url = "${baseUrl}System/ActivityLog/Entries",
+                authHeader = authHeader,
+                apiKey = token,
+                limit = 20
+            )
+            res.Items
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     // Fetch movies, series, music, live TV from Jellyfin Server
     suspend fun getItems(
         type: MediaType? = null,

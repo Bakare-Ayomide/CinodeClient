@@ -277,6 +277,7 @@ fun JellyfinTopBar(
 fun JellyfinDrawerContent(
     currentDestination: NavDestination,
     activeServerName: String = "Demo Server",
+    isAdmin: Boolean = false,
     onNavigate: (NavDestination) -> Unit = {},
     onOpenServerConnect: () -> Unit = {},
     onCloseDrawer: () -> Unit = {},
@@ -303,6 +304,7 @@ fun JellyfinDrawerContent(
                 ) {
                     NavDestination.entries.forEach { destination ->
                         if (destination == NavDestination.SETTINGS) return@forEach
+                        if (destination == NavDestination.SECURITY && !isAdmin) return@forEach
                         val isSelected = currentDestination == destination ||
                             (destination == NavDestination.MOVIES && currentDestination == NavDestination.TV_SHOWS)
 
@@ -389,6 +391,7 @@ fun JellyfinDrawerContent(
 @Composable
 fun JellyfinTvNavRail(
     currentDestination: NavDestination,
+    isAdmin: Boolean = false,
     onNavigate: (NavDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -409,6 +412,7 @@ fun JellyfinTvNavRail(
             ) {
                 NavDestination.entries.forEach { destination ->
                     if (destination == NavDestination.SETTINGS) return@forEach
+                    if (destination == NavDestination.SECURITY && !isAdmin) return@forEach
                     val isSelected = currentDestination == destination ||
                         (destination == NavDestination.MOVIES && currentDestination == NavDestination.TV_SHOWS)
 

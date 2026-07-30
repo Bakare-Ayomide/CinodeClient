@@ -37,12 +37,15 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -273,7 +276,8 @@ fun OnboardingScreen(
 
 @Composable
 fun AuthScreen(
-    onAuthSuccess: (email: String, name: String) -> Unit,
+    onLoginSubmit: (username: String, pass: String, serverUrl: String, onResult: (Boolean, String?) -> Unit) -> Unit,
+    onSignupSubmit: (name: String, email: String, pass: String, serverUrl: String, onResult: (Boolean, String?) -> Unit) -> Unit,
     onGuestLogin: () -> Unit,
     onOpenOnboarding: () -> Unit,
     modifier: Modifier = Modifier
@@ -283,7 +287,7 @@ fun AuthScreen(
     // Form states
     var loginUsername by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
-    var serverUrl by remember { mutableStateOf("https://demo.jellyfin.org/stable") }
+    var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
     var rememberMe by remember { mutableStateOf(true) }
 
     var signupName by remember { mutableStateOf("") }
@@ -479,32 +483,6 @@ fun AuthScreen(
                     if (activeTab == AuthTab.LOGIN) {
                         // --- LOGIN FORM ---
                         Text(
-                            text = "Jellyfin Server URL",
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = serverUrl,
-                            onValueChange = { serverUrl = it },
-                            placeholder = { Text("https://your-server.com", color = TextMuted) },
-                            leadingIcon = { Icon(Icons.Default.Router, contentDescription = null, tint = JellyfinCyan) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = JellyfinCyan,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_server_url")
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Text(
                             text = "Username or Email",
                             color = TextPrimary,
                             fontSize = 12.sp,
@@ -594,7 +572,12 @@ fun AuthScreen(
                                 }
                                 isLoading = true
                                 errorMessage = null
-                                onAuthSuccess(loginUsername, loginUsername.takeWhile { it != '@' }.capitalize())
+                                onLoginSubmit(loginUsername, loginPassword, serverUrl) { success, err ->
+                                    isLoading = false
+                                    if (!success) {
+                                        errorMessage = err ?: "Login failed. Please check your credentials."
+                                    }
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             testTag = "btn_submit_login"
@@ -627,135 +610,298 @@ fun AuthScreen(
                         }
 
                     } else {
-                        // --- SIGN UP FORM ---
-                        Text(
-                            text = "Full Name",
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = signupName,
-                            onValueChange = { signupName = it },
-                            placeholder = { Text("Alex Morgan", color = TextMuted) },
-                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = JellyfinCyan) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = JellyfinCyan,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_signup_name")
-                        )
+                        // --- MULTI-STEP SIGN UP ONBOARDING FLOW ---
+                        var signupStep by remember { mutableIntStateOf(1) }
+                        var preferredQuality by remember { mutableStateOf("4K Ultra HD") }
+                        var enableOfflineSync by remember { mutableStateOf(true) }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "Email Address",
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = signupEmail,
-                            onValueChange = { signupEmail = it },
-                            placeholder = { Text("alex@example.com", color = TextMuted) },
-                            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = JellyfinCyan) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = JellyfinCyan,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_signup_email")
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "Password",
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = signupPassword,
-                            onValueChange = { signupPassword = it },
-                            placeholder = { Text("Minimum 6 characters", color = TextMuted) },
-                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = JellyfinCyan) },
-                            visualTransformation = PasswordVisualTransformation(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = JellyfinCyan,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_signup_password")
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
+                        // Step Indicator Progress Bar
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Checkbox(
-                                checked = acceptTerms,
-                                onCheckedChange = { acceptTerms = it },
-                                colors = CheckboxDefaults.colors(checkedColor = JellyfinCyan)
-                            )
                             Text(
-                                text = "I accept terms of service & privacy policy",
-                                color = TextMuted,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Submit Signup Button
-                        TvFocusableCard(
-                            onClick = {
-                                if (signupEmail.isBlank() || signupName.isBlank()) {
-                                    errorMessage = "Please complete all required fields."
-                                    return@TvFocusableCard
-                                }
-                                isLoading = true
-                                errorMessage = null
-                                onAuthSuccess(signupEmail, signupName)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            testTag = "btn_submit_signup"
-                        ) {
-                            Surface(
+                                text = "STEP $signupStep OF 3",
                                 color = JellyfinPurple,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Box(
-                                    modifier = Modifier.padding(vertical = 14.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Create Account & Sign In",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.sp
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                (1..3).forEach { step ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = if (signupStep == step) 24.dp else 8.dp, height = 6.dp)
+                                            .clip(CircleShape)
+                                            .background(if (signupStep >= step) JellyfinPurple else Color.White.copy(alpha = 0.2f))
                                     )
                                 }
+                            }
+                        }
+
+                        if (signupStep == 1) {
+                            // --- STEP 1: ACCOUNT DETAILS ---
+                            Text(
+                                text = "Full Name",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = signupName,
+                                onValueChange = { signupName = it },
+                                placeholder = { Text("Alex Morgan", color = TextMuted) },
+                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = JellyfinPurple) },
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = JellyfinPurple,
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("input_signup_name")
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "Email Address",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = signupEmail,
+                                onValueChange = { signupEmail = it },
+                                placeholder = { Text("alex@example.com", color = TextMuted) },
+                                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = JellyfinPurple) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = JellyfinPurple,
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("input_signup_email")
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "Password",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = signupPassword,
+                                onValueChange = { signupPassword = it },
+                                placeholder = { Text("Minimum 6 characters", color = TextMuted) },
+                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = JellyfinPurple) },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = JellyfinPurple,
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("input_signup_password")
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            TvFocusableCard(
+                                onClick = {
+                                    if (signupName.isBlank() && signupEmail.isBlank()) {
+                                        errorMessage = "Please enter your name or email address."
+                                        return@TvFocusableCard
+                                    }
+                                    errorMessage = null
+                                    signupStep = 2
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                testTag = "btn_signup_next_1"
+                            ) {
+                                Surface(
+                                    color = JellyfinPurple,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Continue to Media Preferences →",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (signupStep == 2) {
+                            // --- STEP 2: MEDIA & QUALITY PREFERENCES ---
+                            Text(
+                                text = "Preferred Streaming Quality",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            listOf("4K Ultra HD (HDR / Dolby Vision)", "1080p Full HD (High Quality)", "Auto Dynamic (Data Saver)").forEach { option ->
+                                Surface(
+                                    color = if (preferredQuality == option) JellyfinPurple.copy(alpha = 0.25f) else JellyfinSurfaceVariant,
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clickable { preferredQuality = option }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(option, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        if (preferredQuality == option) {
+                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = JellyfinPurple, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { signupStep = 1 },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Back", color = TextMuted)
+                                }
+                                Button(
+                                    onClick = { signupStep = 3 },
+                                    colors = ButtonDefaults.buttonColors(containerColor = JellyfinPurple),
+                                    modifier = Modifier.weight(1.5f)
+                                ) {
+                                    Text("Next: Features →")
+                                }
+                            }
+                        } else {
+                            // --- STEP 3: PLAYBACK & ACTIVATION ---
+                            Text(
+                                text = "Offline & Playback Setup",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Checkbox(
+                                    checked = enableOfflineSync,
+                                    onCheckedChange = { enableOfflineSync = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = JellyfinPurple)
+                                )
+                                Column {
+                                    Text("Enable Offline Downloads", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("Save movies to local device storage for travel", color = TextMuted, fontSize = 11.sp)
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Checkbox(
+                                    checked = acceptTerms,
+                                    onCheckedChange = { acceptTerms = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = JellyfinPurple)
+                                )
+                                Text("I accept terms of service & privacy policy", color = TextMuted, fontSize = 12.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            // Submit Signup Button
+                            TvFocusableCard(
+                                onClick = {
+                                    if (signupName.isBlank() && signupEmail.isBlank()) {
+                                        errorMessage = "Please complete all required fields."
+                                        return@TvFocusableCard
+                                    }
+                                    isLoading = true
+                                    errorMessage = null
+                                    onSignupSubmit(signupName, signupEmail, signupPassword, serverUrl) { success, err ->
+                                        isLoading = false
+                                        if (!success) {
+                                            errorMessage = err ?: "Signup failed on Jellyfin server."
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                testTag = "btn_submit_signup"
+                            ) {
+                                Surface(
+                                    color = JellyfinPurple,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = Color.White,
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Complete Sign Up & Launch Library",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            TextButton(
+                                onClick = { signupStep = 2 },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("← Back to Preferences", color = TextMuted, fontSize = 12.sp)
                             }
                         }
                     }

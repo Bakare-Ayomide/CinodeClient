@@ -315,8 +315,135 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    fun loginWithServer(username: String, pass: String, serverUrl: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, serverErrorMessage = null)
+            val res = repository.connectToServer(serverUrl, username, pass)
+            res.fold(
+                onSuccess = { server ->
+                    _uiState.value = _uiState.value.copy(
+                        activeServer = server,
+                        isAuthenticated = true,
+                        currentUserEmail = if (username.contains("@")) username else "$username@jellyfin.local",
+                        currentUserName = username.takeWhile { it != '@' }.ifBlank { "Jellyfin User" },
+                        showAuthFlow = false,
+                        showOnboardingFlow = false,
+                        isLoading = false,
+                        currentDestination = NavDestination.HOME
+                    )
+                    loadAllServerItems(server)
+                    onResult(true, null)
+                },
+                onFailure = { err ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        serverErrorMessage = err.localizedMessage ?: "Failed to authenticate with server"
+                    )
+                    onResult(false, err.localizedMessage ?: "Failed to authenticate")
+                }
+            )
+        }
+    }
+
+    fun signupWithServer(name: String, email: String, pass: String, serverUrl: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, serverErrorMessage = null)
+            val res = repository.signupUser(name, email, pass, serverUrl)
+            res.fold(
+                onSuccess = { server ->
+                    _uiState.value = _uiState.value.copy(
+                        activeServer = server,
+                        isAuthenticated = true,
+                        currentUserEmail = email,
+                        currentUserName = name.ifBlank { "Jellyfin User" },
+                        showAuthFlow = false,
+                        showOnboardingFlow = false,
+                        isLoading = false,
+                        currentDestination = NavDestination.HOME
+                    )
+                    loadAllServerItems(server)
+                    onResult(true, null)
+                },
+                onFailure = { err ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        serverErrorMessage = err.localizedMessage ?: "Failed to register user"
+                    )
+                    onResult(false, err.localizedMessage ?: "Failed to register user")
+                }
+            )
+        }
+    }
+
     fun loginGuest() {
         login("guest@jellyfin.demo", "Guest User")
+    }
+
+    private val _adminUsers = MutableStateFlow<List<com.example.data.api.JellyfinUserResponse>>(emptyList())
+    val adminUsers: StateFlow<List<com.example.data.api.JellyfinUserResponse>> = _adminUsers.asStateFlow()
+
+    private val _adminSessions = MutableStateFlow<List<com.example.data.api.JellyfinSessionDto>>(emptyList())
+    val adminSessions: StateFlow<List<com.example.data.api.JellyfinSessionDto>> = _adminSessions.asStateFlow()
+
+    private val _adminMediaFolders = MutableStateFlow<List<com.example.data.api.JellyfinMediaFolderDto>>(emptyList())
+    val adminMediaFolders: StateFlow<List<com.example.data.api.JellyfinMediaFolderDto>> = _adminMediaFolders.asStateFlow()
+
+    private val _adminActivityLogs = MutableStateFlow<List<com.example.data.api.JellyfinActivityLogDto>>(emptyList())
+    val adminActivityLogs: StateFlow<List<com.example.data.api.JellyfinActivityLogDto>> = _adminActivityLogs.asStateFlow()
+
+    private val _isAdminLoading = MutableStateFlow(false)
+    val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
+
+    fun fetchAdminDashboardData() {
+        viewModelScope.launch {
+            _isAdminLoading.value = true
+            val activeServer = _uiState.value.activeServer
+            val users = repository.getUsersList(activeServer)
+            val sessions = repository.getActiveSessionsList(activeServer)
+            val folders = repository.getMediaFoldersList(activeServer)
+            val logs = repository.getActivityLogsList(activeServer)
+
+            _adminUsers.value = users
+            _adminSessions.value = sessions
+            _adminMediaFolders.value = folders
+            _adminActivityLogs.value = logs
+            _isAdminLoading.value = false
+        }
+    }
+
+    fun createAdminUser(name: String, pass: String?, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            _isAdminLoading.value = true
+            val result = repository.createNewUser(name, pass, _uiState.value.activeServer)
+            _isAdminLoading.value = false
+            if (result.isSuccess) {
+                fetchAdminDashboardData()
+                onResult(true, null)
+            } else {
+                onResult(false, result.exceptionOrNull()?.message ?: "Failed to create user on Jellyfin server")
+            }
+        }
+    }
+
+    fun deleteAdminUser(userId: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isAdminLoading.value = true
+            val success = repository.deleteUser(userId, _uiState.value.activeServer)
+            _isAdminLoading.value = false
+            if (success) {
+                fetchAdminDashboardData()
+            }
+            onResult(success)
+        }
+    }
+
+    fun triggerLibraryRefresh(onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isAdminLoading.value = true
+            val success = repository.triggerLibraryScan(_uiState.value.activeServer)
+            _isAdminLoading.value = false
+            onResult(success)
+        }
     }
 
     fun logout() {

@@ -325,7 +325,7 @@ fun CinodeDrawerContent(
                                 .testTag("drawer_icon_${destination.name.lowercase()}"),
                             contentAlignment = Alignment.Center
                         ) {
-                            val iconColor = if (isSelected) Color.White else JellyfinRed
+                            val iconColor = Color.White
                             Icon(
                                 imageVector = destination.icon,
                                 contentDescription = destination.title,
@@ -447,7 +447,7 @@ fun CinodeTvNavRail(
                             .testTag("rail_icon_${destination.name.lowercase()}"),
                         contentAlignment = Alignment.Center
                     ) {
-                        val iconColor = if (isSelected) Color.White else JellyfinRed
+                        val iconColor = Color.White
                         Icon(
                             imageVector = destination.icon,
                             contentDescription = destination.title,

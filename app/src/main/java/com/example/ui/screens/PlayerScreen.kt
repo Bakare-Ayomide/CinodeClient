@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.os.Build
-import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -78,6 +77,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -101,6 +101,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.JellyfinItem
@@ -113,6 +119,7 @@ import com.example.ui.theme.JellyfinSurface
 import com.example.ui.theme.JellyfinSurfaceVariant
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
+import java.io.File
 import kotlinx.coroutines.delay
 
 enum class PlayerSheetType {
@@ -254,7 +261,65 @@ fun PlayerScreen(
         }
     }
 
-    var isHardwareVideoAvailable by remember { mutableStateOf(true) }
+    // Initialize Media3 ExoPlayer Engine for fast, buffering-free streaming & local playback
+    val exoPlayer = remember(context) {
+        ExoPlayer.Builder(context).build()
+    }
+
+    val localDownloadedFile = remember(item.id) { File(context.filesDir, "downloads/${item.id}.mp4") }
+    val mediaUri = remember(item.id, item.videoUrl) {
+        if (localDownloadedFile.exists() && localDownloadedFile.length() > 0) {
+            android.net.Uri.fromFile(localDownloadedFile)
+        } else if (item.videoUrl.isNotBlank()) {
+            android.net.Uri.parse(item.videoUrl)
+        } else {
+            android.net.Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4")
+        }
+    }
+
+    LaunchedEffect(mediaUri) {
+        val mediaItem = MediaItem.fromUri(mediaUri)
+        exoPlayer.setMediaItem(mediaItem)
+        if (currentPositionMs > 0) {
+            exoPlayer.seekTo(currentPositionMs)
+        }
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = isPlaying
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            exoPlayer.play()
+        } else {
+            exoPlayer.pause()
+        }
+    }
+
+    LaunchedEffect(playbackSpeed, isTemporary2x) {
+        val speed = if (isTemporary2x) 2.0f else playbackSpeed
+        exoPlayer.playbackParameters = PlaybackParameters(speed)
+    }
+
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            delay(500)
+            if (exoPlayer.duration > 0) {
+                durationMs = exoPlayer.duration
+            }
+            if (exoPlayer.isPlaying) {
+                currentPositionMs = exoPlayer.currentPosition
+                if (currentPositionMs % 5000L < 500L) {
+                    onSaveProgress(currentPositionMs, durationMs)
+                }
+            }
+        }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -263,20 +328,18 @@ fun PlayerScreen(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {
-                        if (isScreenLocked) {
-                            showControls = !showControls
-                        } else {
-                            showControls = !showControls
-                        }
+                        showControls = !showControls
                     },
                     onDoubleTap = { offset ->
                         if (!isScreenLocked) {
                             if (offset.x < size.width / 2) {
                                 currentPositionMs = (currentPositionMs - 10000L).coerceAtLeast(0L)
+                                exoPlayer.seekTo(currentPositionMs)
                                 gestureOverlayText = "-10s"
                                 gestureOverlayIcon = Icons.Default.FastRewind
                             } else {
                                 currentPositionMs = (currentPositionMs + 10000L).coerceAtMost(durationMs)
+                                exoPlayer.seekTo(currentPositionMs)
                                 gestureOverlayText = "+10s"
                                 gestureOverlayIcon = Icons.Default.FastForward
                             }
@@ -302,12 +365,10 @@ fun PlayerScreen(
                             val x = change.position.x
                             val yAmount = dragAmount.y
                             if (x < size.width / 2) {
-                                // Adjust Brightness
                                 brightnessLevel = (brightnessLevel - (yAmount / 800f)).coerceIn(0.1f, 1.0f)
                                 gestureOverlayText = "Brightness ${(brightnessLevel * 100).toInt()}%"
                                 gestureOverlayIcon = Icons.Default.Brightness6
                             } else {
-                                // Adjust Volume
                                 volumeLevel = (volumeLevel - (yAmount / 800f)).coerceIn(0.0f, 1.0f)
                                 gestureOverlayText = "Volume ${(volumeLevel * 100).toInt()}%"
                                 gestureOverlayIcon = if (volumeLevel == 0f) Icons.Default.VolumeMute else Icons.Default.VolumeUp
@@ -317,50 +378,35 @@ fun PlayerScreen(
                 )
             }
     ) {
-        // Native Hardware Video Player Surface
-        if (isHardwareVideoAvailable) {
-            AndroidView(
-                factory = { ctx ->
-                    VideoView(ctx).apply {
-                        val streamUri = android.net.Uri.parse(
-                            if (item.videoUrl.isNotEmpty()) item.videoUrl else "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
-                        )
-                        setVideoURI(streamUri)
-                        setOnErrorListener { _, _, _ ->
-                            isHardwareVideoAvailable = false
-                            true
-                        }
-                        setOnPreparedListener { mp ->
-                            try {
-                                mp.setVideoScalingMode(android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
-                            } catch (e: Exception) {}
-                            durationMs = mp.duration.toLong().coerceAtLeast(180000L)
-                            mp.start()
-                            isPlaying = true
-                        }
-                        setOnCompletionListener {
-                            isPlaying = false
-                            onSaveProgress(durationMs, durationMs)
-                        }
+        // High Performance ExoPlayer Surface View
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = false
+                    resizeMode = when (selectedAspectRatio) {
+                        "Crop", "Zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        "Fill" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        "16:9" -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+                        "4:3" -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
+                        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
-                },
-                update = { videoView ->
-                    if (isPlaying) {
-                        if (!videoView.isPlaying && isHardwareVideoAvailable) {
-                            try { videoView.start() } catch (e: Exception) { isHardwareVideoAvailable = false }
-                        }
-                    } else {
-                        if (videoView.isPlaying) {
-                            try { videoView.pause() } catch (e: Exception) {}
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+                }
+            },
+            update = { playerView ->
+                playerView.resizeMode = when (selectedAspectRatio) {
+                    "Crop", "Zoom" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    "Fill" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    "16:9" -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+                    "4:3" -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
+                    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
 
         // Backdrop Ambient Player Fallback
-        if (!isHardwareVideoAvailable || item.videoUrl.isEmpty()) {
+        if (item.videoUrl.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize()) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -853,6 +899,7 @@ fun PlayerScreen(
                             currentPositionMs = it.toLong()
                         },
                         onValueChangeFinished = {
+                            exoPlayer.seekTo(seekingPosMs)
                             isSeeking = false
                         },
                         valueRange = 0f..durationMs.toFloat(),

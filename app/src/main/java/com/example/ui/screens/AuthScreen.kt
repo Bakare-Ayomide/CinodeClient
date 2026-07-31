@@ -288,7 +288,7 @@ fun AuthScreen(
     // Form states
     var loginUsername by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
-    var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
+    var serverUrl by remember { mutableStateOf("https://demo.jellyfin.org") }
     var rememberMe by remember { mutableStateOf(true) }
 
     var signupName by remember { mutableStateOf("") }

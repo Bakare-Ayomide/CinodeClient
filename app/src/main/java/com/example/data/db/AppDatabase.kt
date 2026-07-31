@@ -6,8 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ServerEntity::class, FavoriteEntity::class, MediaProgressEntity::class, DownloadEntity::class],
-    version = 2,
+    entities = [
+        ServerEntity::class,
+        FavoriteEntity::class,
+        MediaProgressEntity::class,
+        DownloadEntity::class,
+        MonnifyConfigEntity::class,
+        MonnifyTransactionEntity::class
+    ],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -15,6 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun mediaProgressDao(): MediaProgressDao
     abstract fun downloadDao(): DownloadDao
+    abstract fun monnifyDao(): MonnifyDao
 
     companion object {
         @Volatile

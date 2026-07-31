@@ -76,7 +76,7 @@ fun ServerConnectScreen(
     errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
+    var serverUrl by remember { mutableStateOf("https://demo.jellyfin.org") }
     var useApiKey by remember { mutableStateOf(false) }
     var username by remember { mutableStateOf("admin") }
     var password by remember { mutableStateOf("") }
@@ -200,9 +200,9 @@ fun ServerConnectScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 FilterChip(
-                                    selected = serverUrl == "https://cinode.zerolord.com",
-                                    onClick = { serverUrl = "https://cinode.zerolord.com" },
-                                    label = { Text("cinode.zerolord.com", fontSize = 11.sp) },
+                                    selected = serverUrl == "https://demo.jellyfin.org",
+                                    onClick = { serverUrl = "https://demo.jellyfin.org" },
+                                    label = { Text("demo.jellyfin.org", fontSize = 11.sp) },
                                     leadingIcon = { Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(14.dp)) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = JellyfinCyan.copy(alpha = 0.3f),

@@ -30,6 +30,7 @@ import com.example.ui.components.CinodeTvNavRail
 import com.example.ui.components.JellyfinDrawerContent
 import com.example.ui.components.JellyfinTopBar
 import com.example.ui.components.JellyfinTvNavRail
+import com.example.ui.components.MonnifyPaymentDialog
 import com.example.ui.components.NavDestination
 import com.example.ui.components.TvRemoteOverlay
 import com.example.ui.screens.AuthScreen
@@ -218,6 +219,7 @@ fun CinodeAppContent(
                                 series = series,
                                 allDownloads = allDownloads,
                                 viewModel = viewModel,
+                                isAdminUser = isAdminUser,
                                 onOpenDrawer = { scope.launch { drawerState.open() } }
                             )
                         }
@@ -234,10 +236,31 @@ fun CinodeAppContent(
                             series = series,
                             allDownloads = allDownloads,
                             viewModel = viewModel,
+                            isAdminUser = isAdminUser,
                             onOpenDrawer = { scope.launch { drawerState.open() } }
                         )
                     }
                 }
+            }
+
+            // Floating Monnify Payment Gateway Modal
+            if (uiState.showMonnifyPaymentModal && uiState.itemPendingPayment != null) {
+                val monnifyConfig by viewModel.monnifyConfig.collectAsStateWithLifecycle()
+                MonnifyPaymentDialog(
+                    item = uiState.itemPendingPayment,
+                    config = monnifyConfig,
+                    userEmail = uiState.currentUserEmail.ifBlank { "user@cinode.stream" },
+                    userName = uiState.currentUserName.ifBlank { "Cinode Streamer" },
+                    onDismiss = { viewModel.closeMonnifyPaymentModal() },
+                    onPaymentSuccess = { item, planType, paymentRef, channel ->
+                        viewModel.processMonnifyPayment(
+                            item = item,
+                            planType = planType,
+                            paymentRef = paymentRef,
+                            method = channel
+                        ) { _, _ -> }
+                    }
+                )
             }
 
             // Floating TV D-Pad Remote Controller Overlay
@@ -274,6 +297,7 @@ fun MainScreenContent(
     series: List<com.example.data.model.JellyfinItem>,
     allDownloads: List<com.example.data.db.DownloadEntity>,
     viewModel: JellyfinViewModel,
+    isAdminUser: Boolean = false,
     onOpenDrawer: () -> Unit = {}
 ) {
     // If an item is selected, show DetailScreen
@@ -285,8 +309,22 @@ fun MainScreenContent(
             isFavorite = uiState.selectedItem.isFavorite,
             downloadState = downloadState,
             onBack = { viewModel.clearSelectedItem() },
-            onPlay = { item -> viewModel.playMedia(item) },
-            onPlayEpisode = { episode -> viewModel.playEpisode(episode) },
+            onPlay = { item -> viewModel.playMediaWithPaywallCheck(item, isAdminUser) },
+            onPlayEpisode = { episode ->
+                val episodeItem = com.example.data.model.JellyfinItem(
+                    id = episode.id,
+                    title = episode.title,
+                    overview = episode.overview,
+                    mediaType = com.example.data.model.MediaType.EPISODE,
+                    posterUrl = episode.thumbnailUrl,
+                    backdropUrl = episode.thumbnailUrl,
+                    year = "2026",
+                    rating = "8.8",
+                    durationMs = episode.durationMs,
+                    videoUrl = episode.videoUrl
+                )
+                viewModel.playMediaWithPaywallCheck(episodeItem, isAdminUser)
+            },
             onToggleFavorite = { viewModel.toggleFavorite(uiState.selectedItem) },
             onStartDownload = { item -> viewModel.startDownload(item) },
             onDeleteDownload = { itemId -> viewModel.deleteDownload(itemId) }
@@ -304,10 +342,10 @@ fun MainScreenContent(
                 series = series,
                 allItems = allItems,
                 onMediaClick = { item -> viewModel.selectItem(item) },
-                onPlayMedia = { item -> viewModel.playMedia(item) },
+                onPlayMedia = { item -> viewModel.playMediaWithPaywallCheck(item, isAdminUser) },
                 onProgressClick = { progress ->
                     viewModel.getItemDetails(progress.itemId)?.let { item ->
-                        viewModel.playMedia(item)
+                        viewModel.playMediaWithPaywallCheck(item, isAdminUser)
                     }
                 },
                 onNavigateToFilter = { filter ->
@@ -352,7 +390,7 @@ fun MainScreenContent(
         NavDestination.DOWNLOADS -> {
             com.example.ui.screens.DownloadsScreen(
                 downloads = allDownloads,
-                onPlayMedia = { item -> viewModel.playMedia(item) },
+                onPlayMedia = { item -> viewModel.playMediaWithPaywallCheck(item, isAdminUser) },
                 onDeleteDownload = { itemId -> viewModel.deleteDownload(itemId) },
                 onExploreLibrary = { viewModel.navigateTo(NavDestination.MOVIES) }
             )

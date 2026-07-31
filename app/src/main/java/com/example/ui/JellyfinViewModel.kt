@@ -24,6 +24,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.example.data.db.MonnifyConfigEntity
+import com.example.data.db.MonnifyTransactionEntity
+import com.example.ui.components.MonnifyPlanType
+import kotlinx.coroutines.flow.map
+
 data class JellyfinUiState(
     val currentDestination: NavDestination = NavDestination.HOME,
     val selectedFilter: LibraryFilter = LibraryFilter.ALL,
@@ -41,7 +46,9 @@ data class JellyfinUiState(
     val currentUserName: String = "",
     val isOnboardingCompleted: Boolean = false,
     val showOnboardingFlow: Boolean = false,
-    val showAuthFlow: Boolean = true
+    val showAuthFlow: Boolean = true,
+    val showMonnifyPaymentModal: Boolean = false,
+    val itemPendingPayment: JellyfinItem? = null
 )
 
 class JellyfinViewModel(application: Application) : AndroidViewModel(application) {
@@ -51,7 +58,8 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
         db.serverDao(),
         db.favoriteDao(),
         db.mediaProgressDao(),
-        db.downloadDao()
+        db.downloadDao(),
+        db.monnifyDao()
     )
 
     private val _uiState = MutableStateFlow(JellyfinUiState())
@@ -65,6 +73,20 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
 
     val allDownloads: StateFlow<List<DownloadEntity>> = repository.allDownloads
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monnifyConfig: StateFlow<MonnifyConfigEntity> = (repository.monnifyConfigFlow ?: MutableStateFlow(null))
+        .map { it ?: MonnifyConfigEntity() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonnifyConfigEntity())
+
+    val monnifyTransactions: StateFlow<List<MonnifyTransactionEntity>> = (repository.allMonnifyTransactionsFlow ?: MutableStateFlow(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val paidStreamItemIds: StateFlow<Set<String>> = monnifyTransactions
+        .map { list ->
+            list.filter { it.status == "PAID" }.map { it.itemId }.toSet()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
 
     private val _allItems = MutableStateFlow<List<JellyfinItem>>(emptyList())
     val allItems: StateFlow<List<JellyfinItem>> = _allItems.asStateFlow()
@@ -94,6 +116,11 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     init {
         restoreUserSession()
         loadInitialServer()
+        viewModelScope.launch {
+            monnifyConfig.collect { config ->
+                repository.monnifyPaymentService.initializeGateway(config)
+            }
+        }
     }
 
     private fun restoreUserSession() {
@@ -528,6 +555,98 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             showAuthFlow = true,
             showOnboardingFlow = false
         )
+    }
+
+    // Monnify Paywall & Gateway Management
+    fun playMediaWithPaywallCheck(item: JellyfinItem, isAdmin: Boolean = false) {
+        val config = monnifyConfig.value
+        val paidIds = paidStreamItemIds.value
+        val isVip = paidIds.contains("VIP_PASS")
+        val isItemPaid = paidIds.contains(item.id)
+
+        if (!config.isPaywallEnabled || isAdmin || isVip || isItemPaid) {
+            playMedia(item)
+        } else {
+            _uiState.value = _uiState.value.copy(
+                itemPendingPayment = item,
+                showMonnifyPaymentModal = true
+            )
+        }
+    }
+
+    fun closeMonnifyPaymentModal() {
+        _uiState.value = _uiState.value.copy(
+            showMonnifyPaymentModal = false,
+            itemPendingPayment = null
+        )
+    }
+
+    fun processMonnifyPayment(
+        item: JellyfinItem,
+        planType: MonnifyPlanType,
+        paymentRef: String,
+        method: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val config = monnifyConfig.value
+                val isVip = planType == MonnifyPlanType.VIP_PASS
+                val targetItemId = if (isVip) "VIP_PASS" else item.id
+                val targetTitle = if (isVip) "VIP All-Access Pass" else item.title
+                val amount = if (isVip) config.vipPassPriceNgn else config.streamPriceNgn
+                val email = _uiState.value.currentUserEmail.ifBlank { "user@cinode.stream" }
+
+                // 1. Initialize with Monnify Payment Service initialized with admin credentials
+                val initRes = repository.monnifyPaymentService.processSubscriptionPayment(
+                    customerName = _uiState.value.currentUserName,
+                    customerEmail = email,
+                    planTitle = targetTitle,
+                    amountNgn = amount
+                )
+
+                // 2. Record transaction in Room DB
+                val transaction = MonnifyTransactionEntity(
+                    paymentRef = if (initRes.paymentReference.isNotBlank()) initRes.paymentReference else paymentRef,
+                    itemId = targetItemId,
+                    itemTitle = targetTitle,
+                    userEmail = email,
+                    amountNgn = amount,
+                    status = "PAID",
+                    paymentMethod = method,
+                    virtualAccountNo = initRes.virtualAccountNumber,
+                    bankName = initRes.bankName,
+                    transactionReference = initRes.transactionReference,
+                    paidAt = System.currentTimeMillis()
+                )
+                repository.recordMonnifyTransaction(transaction)
+
+                // 3. Unlock stream & launch Player
+                closeMonnifyPaymentModal()
+                playMedia(item)
+                onResult(true, "Monnify Payment Successful! Stream unlocked.")
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "Failed to process Monnify payment.")
+            }
+        }
+    }
+
+    fun saveMonnifyConfig(config: MonnifyConfigEntity, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                repository.saveMonnifyConfig(config)
+                onResult(true)
+            } catch (e: Exception) {
+                onResult(false)
+            }
+        }
+    }
+
+    fun testMonnifyCredentials(apiKey: String, secretKey: String, useSandbox: Boolean, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val res = repository.testMonnifyCredentials(apiKey, secretKey, useSandbox)
+            onResult(res.isSuccess, res.message)
+        }
     }
 }
 

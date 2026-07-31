@@ -43,6 +43,11 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import com.example.data.db.MonnifyConfigEntity
+import com.example.data.db.MonnifyTransactionEntity
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
@@ -142,6 +147,8 @@ fun SecurityScreen(
     val mediaFolders = viewModel?.adminMediaFolders?.collectAsState()?.value ?: emptyList()
     val activityLogs = viewModel?.adminActivityLogs?.collectAsState()?.value ?: emptyList()
     val isLoading = viewModel?.isAdminLoading?.collectAsState()?.value ?: false
+    val monnifyConfig = viewModel?.monnifyConfig?.collectAsState()?.value ?: MonnifyConfigEntity()
+    val monnifyTransactions = viewModel?.monnifyTransactions?.collectAsState()?.value ?: emptyList()
 
     LaunchedEffect(isAdmin) {
         if (isAdmin) {
@@ -410,7 +417,7 @@ fun SecurityScreen(
                                     fontSize = 15.sp
                                 )
                                 Text(
-                                    text = "Server: ${activeServer?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }}",
+                                    text = "Server: ${activeServer?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }}",
                                     color = TextMuted,
                                     fontSize = 12.sp,
                                     fontFamily = FontFamily.Monospace
@@ -511,21 +518,22 @@ fun SecurityScreen(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Grid of 6 Admin Navigation Shortcuts
+                        // Grid of 7 Admin Navigation Shortcuts
                         val menuItems = listOf(
-                            AdminMenuItem("User & Roles", "RBAC, Accounts & Permissions", Icons.Default.Group, IconBlue, 0),
-                            AdminMenuItem("Connected Sessions", "Active Devices & Terminals", Icons.Default.Devices, IconPurple, 1),
-                            AdminMenuItem("Storage & Catalogs", "Media Folders & Scans", Icons.Default.Folder, IconOrange, 2),
-                            AdminMenuItem("Hardware Engine", "CPU, RAM & Transcoding", Icons.Default.Speed, IconGreen, 3),
-                            AdminMenuItem("API Keys & Webhooks", "REST Tokens & OAuth", Icons.Default.Key, IconTeal, 4),
-                            AdminMenuItem("Security Audit Logs", "System Event Journal", Icons.Default.Terminal, IconRed, 5)
+                            AdminMenuItem("User & Roles", "RBAC & Permissions", Icons.Default.Group, IconBlue, 0),
+                            AdminMenuItem("Connected Sessions", "Active Terminals", Icons.Default.Devices, IconPurple, 1),
+                            AdminMenuItem("Storage & Catalogs", "Media Folders", Icons.Default.Folder, IconOrange, 2),
+                            AdminMenuItem("Monnify Gateway", "Paywall & Stream Rates", Icons.Default.Payments, IconYellow, 6),
+                            AdminMenuItem("Hardware Engine", "CPU & Transcoding", Icons.Default.Speed, IconGreen, 3),
+                            AdminMenuItem("API Keys & Webhooks", "REST Tokens", Icons.Default.Key, IconTeal, 4),
+                            AdminMenuItem("Security Audit Logs", "System Journal", Icons.Default.Terminal, IconRed, 5)
                         )
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            menuItems.take(3).forEach { item ->
+                            menuItems.take(4).forEach { item ->
                                 AdminNavMenuCard(
                                     item = item,
                                     isSelected = selectedTab == item.tabIndex,
@@ -539,7 +547,7 @@ fun SecurityScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            menuItems.drop(3).forEach { item ->
+                            menuItems.drop(4).forEach { item ->
                                 AdminNavMenuCard(
                                     item = item,
                                     isSelected = selectedTab == item.tabIndex,
@@ -560,7 +568,8 @@ fun SecurityScreen(
                     TabSpec("Libraries", Icons.Default.Folder, IconOrange),
                     TabSpec("Transcoder", Icons.Default.Speed, IconGreen),
                     TabSpec("API Keys", Icons.Default.Key, IconTeal),
-                    TabSpec("Audit Logs", Icons.Default.Terminal, IconRed)
+                    TabSpec("Audit Logs", Icons.Default.Terminal, IconRed),
+                    TabSpec("Monnify Paywall", Icons.Default.Payments, IconYellow)
                 )
 
                 TabRow(
@@ -639,6 +648,20 @@ fun SecurityScreen(
                         activeServer = activeServer,
                         activityLogs = activityLogs,
                         onPurgeCache = { actionNotice = "Server image & transcode cache purged." }
+                    )
+                    6 -> AdminMonnifyTab(
+                        config = monnifyConfig,
+                        transactions = monnifyTransactions,
+                        onSaveConfig = { newConfig ->
+                            viewModel?.saveMonnifyConfig(newConfig) { success ->
+                                actionNotice = if (success) "Monnify Gateway settings saved." else "Failed to save Monnify settings."
+                            }
+                        },
+                        onTestCredentials = { key, secret, isSandbox ->
+                            viewModel?.testMonnifyCredentials(key, secret, isSandbox) { success, msg ->
+                                actionNotice = msg
+                            }
+                        }
                     )
                 }
             }
@@ -1045,7 +1068,7 @@ private fun AdminSystemTab(
         "[03:15:10] AUTH SUCCESS: Admin user '${BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }}' authenticated via API key.",
         "[03:00:00] MEDIA SYNC: Fetched 4K Movies & Series library catalog",
         "[02:45:22] HARDWARE TRANSCODE: NVENC H.265 stream started",
-        "[02:30:00] SYSTEM: SSL/TLS Certificate validated (https://cinode.zerolord.com)"
+        "[02:30:00] SYSTEM: SSL/TLS Certificate validated (https://demo.jellyfin.org)"
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1058,7 +1081,7 @@ private fun AdminSystemTab(
                         Text("Server Address", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(activeServer?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text(activeServer?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
             }
 
@@ -1330,3 +1353,302 @@ private fun AdminApiKeysTab(
         }
     }
 }
+
+@Composable
+private fun AdminMonnifyTab(
+    config: MonnifyConfigEntity,
+    transactions: List<MonnifyTransactionEntity>,
+    onSaveConfig: (MonnifyConfigEntity) -> Unit,
+    onTestCredentials: (apiKey: String, secretKey: String, useSandbox: Boolean) -> Unit
+) {
+    var isPaywallEnabled by remember(config) { mutableStateOf(config.isPaywallEnabled) }
+    var useSandbox by remember(config) { mutableStateOf(config.useSandbox) }
+    var apiKey by remember(config) { mutableStateOf(config.apiKey) }
+    var secretKey by remember(config) { mutableStateOf(config.secretKey) }
+    var contractCode by remember(config) { mutableStateOf(config.contractCode) }
+    var streamPrice by remember(config) { mutableStateOf(config.streamPriceNgn.toInt().toString()) }
+    var vipPrice by remember(config) { mutableStateOf(config.vipPassPriceNgn.toInt().toString()) }
+
+    val totalRevenue = remember(transactions) {
+        transactions.filter { it.status == "PAID" }.sumOf { it.amountNgn }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Section Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(IconYellow.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Payments, contentDescription = null, tint = IconYellow, modifier = Modifier.size(20.dp))
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text("Monnify Payment Gateway & Paywall Console", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Configure API credentials, stream pricing & view transaction logs", color = TextMuted, fontSize = 11.sp)
+                }
+            }
+
+            Surface(
+                color = if (isPaywallEnabled) Color(0xFF4CAF50).copy(alpha = 0.2f) else JellyfinRed.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = if (isPaywallEnabled) "PAYWALL ACTIVE" else "PAYWALL DISABLED",
+                    color = if (isPaywallEnabled) Color(0xFF4CAF50) else JellyfinRed,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 1. Paywall Master Switch Card
+        Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Require Monnify Payment Before Streaming", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("When enabled, non-admin users must pay per-movie or hold a VIP pass before streaming starts.", color = TextMuted, fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = isPaywallEnabled,
+                    onCheckedChange = { isPaywallEnabled = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = JellyfinCyan, checkedTrackColor = JellyfinPurple)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 2. Monnify Credentials Form Card
+        Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("MONNIFY API CREDENTIALS & ENVIRONMENT", color = JellyfinCyan, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, letterSpacing = 1.sp)
+                Text("Developer Dashboard: https://developers.monnify.com/", color = TextMuted, fontSize = 11.sp)
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text("Environment Mode", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        color = if (useSandbox) JellyfinCyan.copy(alpha = 0.2f) else JellyfinSurfaceVariant,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.clickable { useSandbox = true }
+                    ) {
+                        Text(
+                            text = "Sandbox Mode (https://sandbox.monnify.com)",
+                            color = if (useSandbox) JellyfinCyan else TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    Surface(
+                        color = if (!useSandbox) Color(0xFF4CAF50).copy(alpha = 0.2f) else JellyfinSurfaceVariant,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.clickable { useSandbox = false }
+                    ) {
+                        Text(
+                            text = "Production Mode (https://api.monnify.com)",
+                            color = if (!useSandbox) Color(0xFF4CAF50) else TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text("Monnify API Key (e.g., MK_TEST_SAF789Q2WS)", color = TextMuted) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = adminTextFieldColors(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = secretKey,
+                    onValueChange = { secretKey = it },
+                    label = { Text("Monnify Secret Key", color = TextMuted) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = adminTextFieldColors(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = contractCode,
+                    onValueChange = { contractCode = it },
+                    label = { Text("Monnify Contract Code (e.g., 3489201145)", color = TextMuted) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = adminTextFieldColors(),
+                    singleLine = true
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 3. Pricing Configuration Card
+        Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("STREAMING PRICING & SUBSCRIPTION RATES (NGN)", color = JellyfinCyan, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = streamPrice,
+                        onValueChange = { streamPrice = it },
+                        label = { Text("Single Movie Price (₦)", color = TextMuted) },
+                        modifier = Modifier.weight(1f),
+                        colors = adminTextFieldColors(),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = vipPrice,
+                        onValueChange = { vipPrice = it },
+                        label = { Text("VIP All-Access Pass (₦)", color = TextMuted) },
+                        modifier = Modifier.weight(1f),
+                        colors = adminTextFieldColors(),
+                        singleLine = true
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Action Buttons Row
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { onTestCredentials(apiKey, secretKey, useSandbox) },
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = JellyfinCyan)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Test API Connection", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Button(
+                onClick = {
+                    val newConfig = config.copy(
+                        isPaywallEnabled = isPaywallEnabled,
+                        useSandbox = useSandbox,
+                        apiKey = apiKey,
+                        secretKey = secretKey,
+                        contractCode = contractCode,
+                        streamPriceNgn = streamPrice.toDoubleOrNull() ?: 500.0,
+                        vipPassPriceNgn = vipPrice.toDoubleOrNull() ?: 2500.0,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    onSaveConfig(newConfig)
+                },
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = JellyfinCyan, contentColor = Color.Black)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Save Gateway Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 4. Revenue & Payment Ledger
+        Text("MONNIFY REVENUE & PAYMENT AUDIT LEDGER", color = TextPrimary, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, letterSpacing = 1.sp)
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            MetricCard(
+                title = "TOTAL REVENUE",
+                value = "₦${totalRevenue.toInt()} NGN",
+                icon = Icons.Default.Payments,
+                accentColor = IconGreen,
+                modifier = Modifier.weight(1f)
+            )
+            MetricCard(
+                title = "TRANSACTIONS",
+                value = "${transactions.size} Payments",
+                icon = Icons.Default.CheckCircle,
+                accentColor = IconTeal,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (transactions.isEmpty()) {
+            Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
+                    Text("No Monnify transactions recorded yet. Test stream purchases will appear here in real-time.", color = TextMuted, fontSize = 12.sp)
+                }
+            }
+        } else {
+            transactions.forEach { txn ->
+                Surface(color = JellyfinCardBackground, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(txn.itemTitle, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(JellyfinPurple.copy(alpha = 0.3f)).padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(txn.paymentMethod, color = JellyfinCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("Ref: ${txn.paymentRef} • User: ${txn.userEmail}", color = TextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("₦${txn.amountNgn.toInt()} NGN", color = Color(0xFF4CAF50), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                            Text(txn.status, color = Color(0xFF4CAF50), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun adminTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = JellyfinCyan,
+    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+    focusedLabelColor = JellyfinCyan,
+    unfocusedLabelColor = TextMuted,
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    cursorColor = JellyfinCyan,
+    focusedContainerColor = JellyfinSurfaceVariant,
+    unfocusedContainerColor = JellyfinSurfaceVariant
+)

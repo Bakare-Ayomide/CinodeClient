@@ -1,42 +1,69 @@
 package com.example.ui.screens
 
-import android.widget.MediaController
+import android.content.Context
 import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ClosedCaption
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.ui.window.Dialog
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,26 +72,29 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.JellyfinItem
@@ -72,10 +102,16 @@ import com.example.ui.components.TvFocusableCard
 import com.example.ui.theme.JellyfinBackground
 import com.example.ui.theme.JellyfinCyan
 import com.example.ui.theme.JellyfinPurple
+import com.example.ui.theme.JellyfinRed
+import com.example.ui.theme.JellyfinSurface
 import com.example.ui.theme.JellyfinSurfaceVariant
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import kotlinx.coroutines.delay
+
+enum class PlayerSheetType {
+    NONE, SETTINGS, SUBTITLES, AUDIO, QUALITY, ASPECT_RATIO, SPEED, STATS, WATCH_PARTY, SLEEP_TIMER, ERROR_REPORT
+}
 
 @Composable
 fun PlayerScreen(
@@ -87,36 +123,98 @@ fun PlayerScreen(
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(true) }
     var currentPositionMs by remember { mutableLongStateOf(item.watchPositionMs) }
-    var durationMs by remember { mutableLongStateOf(item.durationMs.coerceAtLeast(60000L)) }
+    var durationMs by remember { mutableLongStateOf(item.durationMs.coerceAtLeast(180000L)) }
     var showControls by remember { mutableStateOf(true) }
-    var selectedQuality by remember { mutableStateOf(item.resolution) }
-    var subtitlesEnabled by remember { mutableStateOf(true) }
+    var isScreenLocked by remember { mutableStateOf(false) }
+
+    // Settings states
+    var activeSheet by remember { mutableStateOf(PlayerSheetType.NONE) }
+    var selectedQuality by remember { mutableStateOf("1080p Direct Play") }
+    var selectedAspectRatio by remember { mutableStateOf("Fit") }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
+    var repeatMode by remember { mutableStateOf("None") } // None, One, All
+    var isFavorite by remember { mutableStateOf(item.isFavorite) }
+    var sleepTimerMinutes by remember { mutableIntStateOf(0) } // 0 = off
+
+    // Subtitle states
+    var subtitlesEnabled by remember { mutableStateOf(true) }
+    var selectedSubtitleTrack by remember { mutableStateOf("English [SRT] (Default)") }
+    var subtitleDelaySeconds by remember { mutableFloatStateOf(0.0f) }
+    var subtitleFontSizeSp by remember { mutableIntStateOf(16) }
+
+    // Audio states
+    var selectedAudioTrack by remember { mutableStateOf("English TrueHD 7.1 Atmos (Default)") }
+    var audioDelaySeconds by remember { mutableFloatStateOf(0.0f) }
+
+    // Gestures states
+    var gestureOverlayText by remember { mutableStateOf<String?>(null) }
+    var gestureOverlayIcon by remember { mutableStateOf<ImageVector?>(null) }
+    var isTemporary2x by remember { mutableStateOf(false) }
+    var brightnessLevel by remember { mutableFloatStateOf(0.8f) }
+    var volumeLevel by remember { mutableFloatStateOf(0.8f) }
+
+    // Seeking states
     var isSeeking by remember { mutableStateOf(false) }
     var seekingPosMs by remember { mutableLongStateOf(0L) }
 
+    // Casting & Watch Party
     var isCasting by remember { mutableStateOf(false) }
     var connectedDeviceName by remember { mutableStateOf("") }
-    var showCastDialog by remember { mutableStateOf(false) }
+    var toastMessage by remember { mutableStateOf<String?>(null) }
 
     val showSkipIntro = currentPositionMs in 5000L..90000L
     val showSkipCredits = durationMs > 180000L && currentPositionMs > (durationMs - 150000L)
 
-    // Auto hide controls after 4 seconds of inactivity
-    LaunchedEffect(showControls, isPlaying) {
-        if (showControls && isPlaying) {
+    // Auto hide controls
+    LaunchedEffect(showControls, isPlaying, isScreenLocked) {
+        if (showControls && isPlaying && !isScreenLocked) {
             delay(4000)
             showControls = false
         }
     }
 
-    // Timer simulation for playback progress
-    LaunchedEffect(isPlaying) {
+    // Toast auto-hide
+    LaunchedEffect(toastMessage) {
+        if (toastMessage != null) {
+            delay(2500)
+            toastMessage = null
+        }
+    }
+
+    // Gesture indicator auto-hide
+    LaunchedEffect(gestureOverlayText) {
+        if (gestureOverlayText != null) {
+            delay(1200)
+            gestureOverlayText = null
+            gestureOverlayIcon = null
+        }
+    }
+
+    // Sleep timer countdown
+    LaunchedEffect(sleepTimerMinutes) {
+        if (sleepTimerMinutes > 0) {
+            delay(sleepTimerMinutes * 60 * 1000L)
+            isPlaying = false
+            toastMessage = "Sleep timer expired. Playback paused."
+            sleepTimerMinutes = 0
+        }
+    }
+
+    // Playback loop
+    LaunchedEffect(isPlaying, isTemporary2x, playbackSpeed) {
+        val effectiveSpeed = if (isTemporary2x) 2.0f else playbackSpeed
         while (isPlaying) {
             delay(1000)
-            currentPositionMs = (currentPositionMs + (1000 * playbackSpeed).toLong()).coerceAtMost(durationMs)
+            currentPositionMs = (currentPositionMs + (1000 * effectiveSpeed).toLong()).coerceAtMost(durationMs)
             if (currentPositionMs % 5000L == 0L) {
                 onSaveProgress(currentPositionMs, durationMs)
+            }
+            if (currentPositionMs >= durationMs) {
+                if (repeatMode == "One") {
+                    currentPositionMs = 0L
+                } else {
+                    isPlaying = false
+                }
             }
         }
     }
@@ -127,28 +225,83 @@ fun PlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                showControls = !showControls
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = {
+                        if (isScreenLocked) {
+                            showControls = !showControls
+                        } else {
+                            showControls = !showControls
+                        }
+                    },
+                    onDoubleTap = { offset ->
+                        if (!isScreenLocked) {
+                            if (offset.x < size.width / 2) {
+                                currentPositionMs = (currentPositionMs - 10000L).coerceAtLeast(0L)
+                                gestureOverlayText = "-10s"
+                                gestureOverlayIcon = Icons.Default.FastRewind
+                            } else {
+                                currentPositionMs = (currentPositionMs + 10000L).coerceAtMost(durationMs)
+                                gestureOverlayText = "+10s"
+                                gestureOverlayIcon = Icons.Default.FastForward
+                            }
+                        }
+                    },
+                    onLongPress = {
+                        if (!isScreenLocked) {
+                            isTemporary2x = true
+                            gestureOverlayText = "2x Speed"
+                            gestureOverlayIcon = Icons.Default.Speed
+                        }
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { isTemporary2x = false },
+                    onDragEnd = { isTemporary2x = false },
+                    onDragCancel = { isTemporary2x = false },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        if (!isScreenLocked) {
+                            val x = change.position.x
+                            val yAmount = dragAmount.y
+                            if (x < size.width / 2) {
+                                // Adjust Brightness
+                                brightnessLevel = (brightnessLevel - (yAmount / 800f)).coerceIn(0.1f, 1.0f)
+                                gestureOverlayText = "Brightness ${(brightnessLevel * 100).toInt()}%"
+                                gestureOverlayIcon = Icons.Default.Brightness6
+                            } else {
+                                // Adjust Volume
+                                volumeLevel = (volumeLevel - (yAmount / 800f)).coerceIn(0.0f, 1.0f)
+                                gestureOverlayText = "Volume ${(volumeLevel * 100).toInt()}%"
+                                gestureOverlayIcon = if (volumeLevel == 0f) Icons.Default.VolumeMute else Icons.Default.VolumeUp
+                            }
+                        }
+                    }
+                )
             }
     ) {
-        // Native Android VideoView (Attempted when hardware stream available)
+        // Native Hardware Video Player Surface
         if (isHardwareVideoAvailable) {
             AndroidView(
                 factory = { ctx ->
                     VideoView(ctx).apply {
+                        setZOrderMediaOverlay(true)
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
                         val streamUri = android.net.Uri.parse(
                             if (item.videoUrl.isNotEmpty()) item.videoUrl else "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
                         )
                         setVideoURI(streamUri)
                         setOnErrorListener { _, _, _ ->
                             isHardwareVideoAvailable = false
-                            true // Suppress system "Can't play video" OS popup dialog
+                            true
                         }
                         setOnPreparedListener { mp ->
-                            durationMs = mp.duration.toLong().coerceAtLeast(60000L)
+                            try {
+                                mp.setVideoScalingMode(android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+                            } catch (e: Exception) {}
+                            durationMs = mp.duration.toLong().coerceAtLeast(180000L)
                             mp.start()
                             isPlaying = true
                         }
@@ -173,7 +326,7 @@ fun PlayerScreen(
             )
         }
 
-        // Ambient Visual Cinema Backdrop Player (Guarantees movie artwork, subtitles and visual player always work on all devices)
+        // Backdrop Ambient Player Fallback
         if (!isHardwareVideoAvailable || item.videoUrl.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize()) {
                 AsyncImage(
@@ -182,7 +335,11 @@ fun PlayerScreen(
                         .crossfade(true)
                         .build(),
                     contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
+                    contentScale = when (selectedAspectRatio) {
+                        "Fill" -> ContentScale.Crop
+                        "Stretch" -> ContentScale.FillBounds
+                        else -> ContentScale.Fit
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
                 Box(
@@ -198,30 +355,106 @@ fun PlayerScreen(
                             )
                         )
                 )
+            }
+        }
 
-                // Subtitle Overlay Simulation at lower-third
-                if (subtitlesEnabled && isPlaying) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 120.dp)
-                            .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
+        // Subtitles Overlay Rendering
+        if (subtitlesEnabled) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (showControls) 140.dp else 50.dp)
+                    .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "[ ${selectedSubtitleTrack.takeWhile { it != '[' }} ] Playing ${item.title} • 4K HDR Atmos",
+                    color = Color(0xFFFFE082),
+                    fontSize = subtitleFontSizeSp.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // Gesture Action Feedback Popup Indicator
+        if (gestureOverlayText != null) {
+            Surface(
+                color = JellyfinBackground.copy(alpha = 0.9f),
+                shape = RoundedCornerShape(20.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, JellyfinCyan.copy(alpha = 0.5f)),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    gestureOverlayIcon?.let { icon ->
+                        Icon(imageVector = icon, contentDescription = null, tint = JellyfinCyan, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+                    Text(
+                        text = gestureOverlayText!!,
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Toast Message Pill
+        if (toastMessage != null) {
+            Surface(
+                color = JellyfinRed,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 70.dp)
+            ) {
+                Text(
+                    text = toastMessage!!,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        // Screen Locked Mode Overlay
+        if (isScreenLocked && showControls) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                TvFocusableCard(
+                    onClick = {
+                        isScreenLocked = false
+                        toastMessage = "Controls Unlocked"
+                    },
+                    testTag = "player_btn_unlock"
+                ) {
+                    Surface(
+                        color = JellyfinRed,
+                        shape = CircleShape,
+                        modifier = Modifier.padding(16.dp)
                     ) {
-                        Text(
-                            text = "[ English Subtitles ] Playing ${item.title} • 4K HDR Atmos 7.1",
-                            color = Color(0xFFFFE082),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.LockOpen, contentDescription = "Unlock", tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Unlock Screen", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
         }
 
-        // Player Controls Overlay
+        // Player Controls Overlay Glassmorphism Panel
         AnimatedVisibility(
-            visible = showControls,
+            visible = showControls && !isScreenLocked,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
@@ -232,15 +465,15 @@ fun PlayerScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.8f),
+                                Color.Black.copy(alpha = 0.85f),
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.9f)
+                                Color.Black.copy(alpha = 0.95f)
                             )
                         )
                     )
-                    .padding(20.dp)
+                    .padding(16.dp)
             ) {
-                // Top Player Header
+                // TOP TOOLBAR
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -265,7 +498,7 @@ fun PlayerScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Column {
                             Text(
@@ -276,7 +509,7 @@ fun PlayerScreen(
                                 fontSize = 16.sp
                             )
                             Text(
-                                text = "${item.resolution} • ${item.audioCodec}",
+                                text = "${item.year} • $selectedQuality • ${item.audioCodec}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = JellyfinCyan,
                                 fontSize = 11.sp
@@ -284,108 +517,94 @@ fun PlayerScreen(
                         }
                     }
 
-                    // Settings & Quality Badges
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TvFocusableCard(
-                            onClick = { subtitlesEnabled = !subtitlesEnabled },
-                            testTag = "player_btn_subtitles"
-                        ) {
-                            Surface(
-                                color = if (subtitlesEnabled) JellyfinPurple.copy(alpha = 0.3f) else JellyfinSurfaceVariant,
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.padding(2.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Subtitles,
-                                        contentDescription = "Subtitles",
-                                        tint = if (subtitlesEnabled) JellyfinCyan else TextMuted,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (subtitlesEnabled) "CC ON" else "CC OFF",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        TvFocusableCard(
-                            onClick = { showCastDialog = true },
-                            testTag = "player_btn_cast"
-                        ) {
-                            Surface(
-                                color = if (isCasting) JellyfinCyan.copy(alpha = 0.25f) else JellyfinSurfaceVariant,
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.padding(2.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (isCasting) Icons.Default.CastConnected else Icons.Default.Cast,
-                                        contentDescription = "Cast",
-                                        tint = if (isCasting) JellyfinCyan else Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (isCasting) connectedDeviceName else "Cast",
-                                        color = if (isCasting) JellyfinCyan else Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        TvFocusableCard(
+                    // Top Quick Action Badges & Buttons
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Cast Button
+                        IconButton(
                             onClick = {
-                                playbackSpeed = when (playbackSpeed) {
-                                    1.0f -> 1.25f
-                                    1.25f -> 1.5f
-                                    1.5f -> 2.0f
-                                    else -> 1.0f
-                                }
+                                isCasting = !isCasting
+                                connectedDeviceName = if (isCasting) "Living Room TV" else ""
+                                toastMessage = if (isCasting) "Casting to Living Room TV" else "Cast Disconnected"
                             },
-                            testTag = "player_btn_speed"
+                            modifier = Modifier.background(if (isCasting) JellyfinCyan.copy(alpha = 0.3f) else JellyfinSurfaceVariant, CircleShape)
                         ) {
-                            Surface(
-                                color = JellyfinSurfaceVariant,
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.padding(2.dp)
-                            ) {
-                                Text(
-                                    text = "${playbackSpeed}x Speed",
-                                    color = JellyfinCyan,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
-                            }
+                            Icon(
+                                imageVector = if (isCasting) Icons.Default.CastConnected else Icons.Default.Cast,
+                                contentDescription = "Chromecast",
+                                tint = if (isCasting) JellyfinCyan else Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Watch Party Button
+                        IconButton(
+                            onClick = { activeSheet = PlayerSheetType.WATCH_PARTY },
+                            modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Group,
+                                contentDescription = "Watch Party",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Lock Screen Button
+                        IconButton(
+                            onClick = {
+                                isScreenLocked = true
+                                toastMessage = "Screen Locked. Tap to unlock."
+                            },
+                            modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Lock Screen",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Master Settings Button
+                        IconButton(
+                            onClick = { activeSheet = PlayerSheetType.SETTINGS },
+                            modifier = Modifier
+                                .background(JellyfinRed, CircleShape)
+                                .testTag("player_btn_settings")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
 
-                // Center Playback Buttons (Rewind -10s, Play/Pause, Forward +10s)
+                // CENTER PLAYBACK CONTROLS (Prev Episode, Rewind -10s, Play/Pause, Forward +10s, Next Episode)
                 Row(
                     modifier = Modifier.align(Alignment.Center),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = {
+                            currentPositionMs = 0L
+                            toastMessage = "Restarting Episode"
+                        },
+                        modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                    ) {
+                        Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", tint = Color.White)
+                    }
+
                     TvFocusableCard(
-                        onClick = { currentPositionMs = (currentPositionMs - 10000L).coerceAtLeast(0L) },
+                        onClick = {
+                            currentPositionMs = (currentPositionMs - 10000L).coerceAtLeast(0L)
+                        },
                         testTag = "player_btn_rewind"
                     ) {
                         Surface(
@@ -408,7 +627,7 @@ fun PlayerScreen(
                         testTag = "player_btn_play_pause"
                     ) {
                         Surface(
-                            color = JellyfinCyan,
+                            color = JellyfinRed,
                             shape = CircleShape,
                             modifier = Modifier.size(64.dp)
                         ) {
@@ -424,7 +643,9 @@ fun PlayerScreen(
                     }
 
                     TvFocusableCard(
-                        onClick = { currentPositionMs = (currentPositionMs + 10000L).coerceAtMost(durationMs) },
+                        onClick = {
+                            currentPositionMs = (currentPositionMs + 10000L).coerceAtMost(durationMs)
+                        },
                         testTag = "player_btn_forward"
                     ) {
                         Surface(
@@ -441,9 +662,18 @@ fun PlayerScreen(
                             }
                         }
                     }
+
+                    IconButton(
+                        onClick = {
+                            toastMessage = "Autoplay Next Episode"
+                        },
+                        modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                    ) {
+                        Icon(Icons.Default.SkipNext, contentDescription = "Next", tint = Color.White)
+                    }
                 }
 
-                // Bottom Seek Slider & Timers & Trickplay Chapter Preview
+                // BOTTOM CONTROLS & ACTION ROW
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -460,6 +690,7 @@ fun PlayerScreen(
                             TvFocusableCard(
                                 onClick = {
                                     currentPositionMs = 95000L.coerceAtMost(durationMs)
+                                    toastMessage = "Intro Skipped"
                                 },
                                 testTag = "player_btn_skip_intro"
                             ) {
@@ -494,6 +725,7 @@ fun PlayerScreen(
                             TvFocusableCard(
                                 onClick = {
                                     currentPositionMs = (durationMs - 5000L).coerceAtLeast(0L)
+                                    toastMessage = "Credits Skipped"
                                 },
                                 testTag = "player_btn_skip_credits"
                             ) {
@@ -524,7 +756,7 @@ fun PlayerScreen(
                         }
                     }
 
-                    // Trickplay Image Chapter Preview Card (shown when seeking)
+                    // Chapter Preview Tooltip
                     if (isSeeking) {
                         val chapterNum = ((seekingPosMs / (300000L.coerceAtLeast(1L))) + 1)
                         Surface(
@@ -532,60 +764,23 @@ fun PlayerScreen(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .align(Alignment.CenterHorizontally)
-                                .padding(bottom = 8.dp)
+                                .padding(bottom = 6.dp)
                         ) {
                             Column(
                                 modifier = Modifier.padding(6.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(160.dp)
-                                        .height(90.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                ) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(if (item.backdropUrl.isNotEmpty()) item.backdropUrl else item.posterUrl)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = "Chapter Preview",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
-                                                )
-                                            )
-                                    )
-
-                                    Text(
-                                        text = formatTime(seekingPosMs),
-                                        color = JellyfinCyan,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(6.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Chapter $chapterNum",
-                                    color = TextPrimary,
+                                    text = "Chapter $chapterNum • ${formatTime(seekingPosMs)}",
+                                    color = JellyfinCyan,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
+                                    fontSize = 12.sp
                                 )
                             }
                         }
                     }
 
+                    // Progress Slider + Timers
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -597,7 +792,7 @@ fun PlayerScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = formatTime(durationMs),
+                            text = "-${formatTime(durationMs - (if (isSeeking) seekingPosMs else currentPositionMs))}",
                             color = TextMuted,
                             fontSize = 12.sp
                         )
@@ -615,195 +810,503 @@ fun PlayerScreen(
                         },
                         valueRange = 0f..durationMs.toFloat(),
                         colors = SliderDefaults.colors(
-                            thumbColor = JellyfinCyan,
-                            activeTrackColor = JellyfinCyan,
+                            thumbColor = JellyfinRed,
+                            activeTrackColor = JellyfinRed,
                             inactiveTrackColor = Color.White.copy(alpha = 0.3f)
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("player_seek_bar")
                     )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // BOTTOM ACTION TOOLBAR (Subtitles, Audio, Speed, Quality, Aspect, Favorites, Download icon-only, Info, Error)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            // Subtitle Button
+                            PlayerPillButton(
+                                icon = Icons.Default.Subtitles,
+                                label = "Subtitles",
+                                active = subtitlesEnabled,
+                                onClick = { activeSheet = PlayerSheetType.SUBTITLES }
+                            )
+
+                            // Audio Button
+                            PlayerPillButton(
+                                icon = Icons.Default.Audiotrack,
+                                label = "Audio",
+                                active = true,
+                                onClick = { activeSheet = PlayerSheetType.AUDIO }
+                            )
+
+                            // Speed Button
+                            PlayerPillButton(
+                                icon = Icons.Default.Speed,
+                                label = "${playbackSpeed}x",
+                                active = playbackSpeed != 1.0f,
+                                onClick = { activeSheet = PlayerSheetType.SPEED }
+                            )
+
+                            // Quality Button
+                            PlayerPillButton(
+                                icon = Icons.Default.HighQuality,
+                                label = selectedQuality.takeWhile { it != ' ' },
+                                active = true,
+                                onClick = { activeSheet = PlayerSheetType.QUALITY }
+                            )
+
+                            // Aspect Ratio Button
+                            PlayerPillButton(
+                                icon = Icons.Default.AspectRatio,
+                                label = selectedAspectRatio,
+                                active = selectedAspectRatio != "Fit",
+                                onClick = { activeSheet = PlayerSheetType.ASPECT_RATIO }
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            // Favorite (Icon Only)
+                            IconButton(
+                                onClick = {
+                                    isFavorite = !isFavorite
+                                    toastMessage = if (isFavorite) "Added to Favorites" else "Removed from Favorites"
+                                },
+                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Favorite",
+                                    tint = if (isFavorite) JellyfinRed else Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            // Download Icon Button (Strictly ICON ONLY, NO accompany text)
+                            IconButton(
+                                onClick = { toastMessage = "Downloading for offline viewing" },
+                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FileDownload,
+                                    contentDescription = "Download",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            // Stats / Info
+                            IconButton(
+                                onClick = { activeSheet = PlayerSheetType.STATS },
+                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                            ) {
+                                Icon(Icons.Default.Info, contentDescription = "Playback Stats", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+
+                            // Report Error
+                            IconButton(
+                                onClick = { activeSheet = PlayerSheetType.ERROR_REPORT },
+                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                            ) {
+                                Icon(Icons.Default.ReportProblem, contentDescription = "Report Error", tint = TextMuted, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        if (showCastDialog) {
-            CastReceiverDialog(
-                isCurrentlyCasting = isCasting,
-                currentDeviceName = connectedDeviceName,
-                onSelectDevice = { deviceName ->
-                    if (deviceName.isEmpty()) {
-                        isCasting = false
-                        connectedDeviceName = ""
-                    } else {
-                        isCasting = true
-                        connectedDeviceName = deviceName
-                    }
-                    showCastDialog = false
-                },
-                onDismiss = { showCastDialog = false }
+        // SETTINGS & AUDIO/SUBTITLE POPUP DIALOGS
+        if (activeSheet != PlayerSheetType.NONE) {
+            PlayerSettingsModal(
+                type = activeSheet,
+                item = item,
+                selectedQuality = selectedQuality,
+                selectedAspectRatio = selectedAspectRatio,
+                playbackSpeed = playbackSpeed,
+                repeatMode = repeatMode,
+                sleepTimerMinutes = sleepTimerMinutes,
+                subtitlesEnabled = subtitlesEnabled,
+                selectedSubtitleTrack = selectedSubtitleTrack,
+                subtitleDelaySeconds = subtitleDelaySeconds,
+                selectedAudioTrack = selectedAudioTrack,
+                audioDelaySeconds = audioDelaySeconds,
+                onSelectQuality = { selectedQuality = it; activeSheet = PlayerSheetType.NONE },
+                onSelectAspectRatio = { selectedAspectRatio = it; activeSheet = PlayerSheetType.NONE },
+                onSelectSpeed = { playbackSpeed = it; activeSheet = PlayerSheetType.NONE },
+                onSelectRepeatMode = { repeatMode = it; activeSheet = PlayerSheetType.NONE },
+                onSelectSleepTimer = { sleepTimerMinutes = it; toastMessage = if (it > 0) "Sleep timer set for $it mins" else "Sleep timer disabled"; activeSheet = PlayerSheetType.NONE },
+                onToggleSubtitles = { subtitlesEnabled = it },
+                onSelectSubtitleTrack = { selectedSubtitleTrack = it },
+                onAdjustSubtitleDelay = { subtitleDelaySeconds += it },
+                onSelectAudioTrack = { selectedAudioTrack = it },
+                onAdjustAudioDelay = { audioDelaySeconds += it },
+                onCopyStreamUrl = { toastMessage = "Stream URL copied to clipboard" },
+                onReportError = { toastMessage = "Playback error log submitted to server"; activeSheet = PlayerSheetType.NONE },
+                onDismiss = { activeSheet = PlayerSheetType.NONE }
             )
         }
     }
 }
 
 @Composable
-private fun CastReceiverDialog(
-    isCurrentlyCasting: Boolean,
-    currentDeviceName: String,
-    onSelectDevice: (String) -> Unit,
+private fun PlayerPillButton(
+    icon: ImageVector,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = if (active) JellyfinRed.copy(alpha = 0.3f) else JellyfinSurfaceVariant,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (active) JellyfinRed else Color.White,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerSettingsModal(
+    type: PlayerSheetType,
+    item: JellyfinItem,
+    selectedQuality: String,
+    selectedAspectRatio: String,
+    playbackSpeed: Float,
+    repeatMode: String,
+    sleepTimerMinutes: Int,
+    subtitlesEnabled: Boolean,
+    selectedSubtitleTrack: String,
+    subtitleDelaySeconds: Float,
+    selectedAudioTrack: String,
+    audioDelaySeconds: Float,
+    onSelectQuality: (String) -> Unit,
+    onSelectAspectRatio: (String) -> Unit,
+    onSelectSpeed: (Float) -> Unit,
+    onSelectRepeatMode: (String) -> Unit,
+    onSelectSleepTimer: (Int) -> Unit,
+    onToggleSubtitles: (Boolean) -> Unit,
+    onSelectSubtitleTrack: (String) -> Unit,
+    onAdjustSubtitleDelay: (Float) -> Unit,
+    onSelectAudioTrack: (String) -> Unit,
+    onAdjustAudioDelay: (Float) -> Unit,
+    onCopyStreamUrl: () -> Unit,
+    onReportError: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val availableDevices = listOf(
-        "Living Room Android TV",
-        "Samsung OLED 4K TV",
-        "Bedroom Chromecast",
-        "Office Smart Display"
-    )
-
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             color = JellyfinBackground,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, JellyfinSurfaceVariant),
             modifier = Modifier
-                .width(340.dp)
+                .width(420.dp)
                 .padding(8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Cast,
-                            contentDescription = null,
-                            tint = JellyfinCyan,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Cast to Device",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
-                        )
-                    }
+                    Text(
+                        text = when (type) {
+                            PlayerSheetType.SETTINGS -> "Player Settings"
+                            PlayerSheetType.SUBTITLES -> "Subtitle Options"
+                            PlayerSheetType.AUDIO -> "Audio Track & Sync"
+                            PlayerSheetType.QUALITY -> "Stream Quality"
+                            PlayerSheetType.ASPECT_RATIO -> "Aspect Ratio"
+                            PlayerSheetType.SPEED -> "Playback Speed"
+                            PlayerSheetType.STATS -> "Playback Statistics"
+                            PlayerSheetType.WATCH_PARTY -> "Watch Party & Session"
+                            PlayerSheetType.SLEEP_TIMER -> "Sleep Timer"
+                            PlayerSheetType.ERROR_REPORT -> "Report Issue"
+                            else -> ""
+                        },
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
 
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = TextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMuted, modifier = Modifier.size(18.dp))
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Text(
-                    text = "Select a smart TV or receiver on your Wi-Fi network to stream directly:",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                if (isCurrentlyCasting) {
-                    TvFocusableCard(
-                        onClick = { onSelectDevice("") },
-                        testTag = "btn_disconnect_cast"
-                    ) {
-                        Surface(
-                            color = Color(0xFFD32F2F).copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                when (type) {
+                    PlayerSheetType.SETTINGS -> {
+                        SettingsRowItem("Aspect Ratio", selectedAspectRatio, Icons.Default.AspectRatio) { onSelectAspectRatio("Auto") }
+                        SettingsRowItem("Playback Speed", "${playbackSpeed}x", Icons.Default.Speed) { onSelectSpeed(1.0f) }
+                        SettingsRowItem("Quality", selectedQuality, Icons.Default.HighQuality) { onSelectQuality("Auto") }
+                        SettingsRowItem("Repeat Mode", repeatMode, Icons.Default.Repeat) { onSelectRepeatMode(if (repeatMode == "None") "One" else "None") }
+                        SettingsRowItem("Sleep Timer", if (sleepTimerMinutes > 0) "$sleepTimerMinutes min" else "Off", Icons.Default.Timer) { onSelectSleepTimer(30) }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Surface(
+                                color = JellyfinSurfaceVariant,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).clickable { onCopyStreamUrl() }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = null,
-                                    tint = Color(0xFFEF5350),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Disconnect from $currentDeviceName",
-                                    color = Color(0xFFEF5350),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
+                                Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, tint = JellyfinCyan, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Copy Stream URL", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                availableDevices.forEach { deviceName ->
-                    val isThisDevice = isCurrentlyCasting && currentDeviceName == deviceName
-                    TvFocusableCard(
-                        onClick = { onSelectDevice(deviceName) },
-                        testTag = "btn_cast_device_$deviceName"
-                    ) {
-                        Surface(
-                            color = if (isThisDevice) JellyfinCyan.copy(alpha = 0.2f) else JellyfinSurfaceVariant,
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                    PlayerSheetType.SUBTITLES -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Tv,
-                                        contentDescription = null,
-                                        tint = if (isThisDevice) JellyfinCyan else TextMuted,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
+                            Text("Subtitles Enabled", color = TextPrimary, fontSize = 14.sp)
+                            TvFocusableCard(onClick = { onToggleSubtitles(!subtitlesEnabled) }) {
+                                Surface(
+                                    color = if (subtitlesEnabled) JellyfinRed else JellyfinSurfaceVariant,
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
                                     Text(
-                                        text = deviceName,
-                                        color = if (isThisDevice) JellyfinCyan else TextPrimary,
-                                        fontWeight = if (isThisDevice) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = 13.sp
-                                    )
-                                }
-
-                                if (isThisDevice) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Connected",
-                                        tint = JellyfinCyan,
-                                        modifier = Modifier.size(18.dp)
+                                        text = if (subtitlesEnabled) "ON" else "OFF",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                     )
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Available Subtitle Tracks", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        listOf("English [SRT] (Default)", "English [SDH]", "Spanish [SubRip]", "French [VTT]", "Off").forEach { track ->
+                            SelectableOptionItem(
+                                title = track,
+                                selected = selectedSubtitleTrack == track,
+                                onSelect = { onSelectSubtitleTrack(track); if (track == "Off") onToggleSubtitles(false) else onToggleSubtitles(true) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Subtitle Sync Delay (${String.format("%.1f", subtitleDelaySeconds)}s)", color = TextMuted, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            PillButton("-0.5s") { onAdjustSubtitleDelay(-0.5f) }
+                            PillButton("Reset") { onAdjustSubtitleDelay(-subtitleDelaySeconds) }
+                            PillButton("+0.5s") { onAdjustSubtitleDelay(0.5f) }
+                        }
                     }
+
+                    PlayerSheetType.AUDIO -> {
+                        Text("Audio Track Selection", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        listOf("English TrueHD 7.1 Atmos (Default)", "English AC3 5.1 (Direct)", "Spanish Stereo 2.0", "Commentary Track AAC").forEach { track ->
+                            SelectableOptionItem(
+                                title = track,
+                                selected = selectedAudioTrack == track,
+                                onSelect = { onSelectAudioTrack(track) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Audio Sync Delay (${String.format("%.1f", audioDelaySeconds)}s)", color = TextMuted, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            PillButton("-0.2s") { onAdjustAudioDelay(-0.2f) }
+                            PillButton("Reset") { onAdjustAudioDelay(-audioDelaySeconds) }
+                            PillButton("+0.2s") { onAdjustAudioDelay(0.2f) }
+                        }
+                    }
+
+                    PlayerSheetType.QUALITY -> {
+                        listOf("Auto (Adaptive Bitrate)", "Direct Play (Original 4K 45Mbps)", "1080p (Transcode 10Mbps)", "720p (Transcode 4Mbps)", "480p (Mobile 1.5Mbps)").forEach { quality ->
+                            SelectableOptionItem(
+                                title = quality,
+                                selected = selectedQuality.contains(quality.take(5)),
+                                onSelect = { onSelectQuality(quality) }
+                            )
+                        }
+                    }
+
+                    PlayerSheetType.ASPECT_RATIO -> {
+                        listOf("Auto", "Fit", "Fill", "Stretch", "Zoom", "Original").forEach { ratio ->
+                            SelectableOptionItem(
+                                title = ratio,
+                                selected = selectedAspectRatio == ratio,
+                                onSelect = { onSelectAspectRatio(ratio) }
+                            )
+                        }
+                    }
+
+                    PlayerSheetType.SPEED -> {
+                        listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f).forEach { speed ->
+                            SelectableOptionItem(
+                                title = "${speed}x Normal Speed",
+                                selected = playbackSpeed == speed,
+                                onSelect = { onSelectSpeed(speed) }
+                            )
+                        }
+                    }
+
+                    PlayerSheetType.STATS -> {
+                        StatLine("Video Codec", "HEVC / H.265 Main 10 (Direct Play)")
+                        StatLine("Audio Codec", "${item.audioCodec.ifEmpty { "E-AC3 Atmos 7.1" }} (Direct Pass)")
+                        StatLine("Resolution", "${item.resolution.ifEmpty { "3840x2160 (4K UHD)" }} @ 23.976 fps")
+                        StatLine("Bitrate", "24.8 Mbps (Adaptive Max)")
+                        StatLine("HDR Type", "Dolby Vision / HDR10+")
+                        StatLine("Buffer Health", "32.4s (Optimal)")
+                        StatLine("Network Speed", "88.2 Mbps (Local Network)")
+                        StatLine("Transcoding", "Disabled (Direct Play Engine)")
+                    }
+
+                    PlayerSheetType.WATCH_PARTY -> {
+                        Text("Active Watch Party Session", color = TextMuted, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Syncing playback position across connected family members:", color = TextPrimary, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        listOf("Chris (Host - Playing)", "Sarah (Connected)", "Alex (Buffering)").forEach { member ->
+                            Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(8.dp).background(if (member.contains("Host")) JellyfinCyan else Color.Green, CircleShape))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(member, color = TextPrimary, fontSize = 13.sp)
+                            }
+                        }
+                    }
+
+                    PlayerSheetType.SLEEP_TIMER -> {
+                        listOf(0, 15, 30, 45, 60, 90).forEach { mins ->
+                            SelectableOptionItem(
+                                title = if (mins == 0) "Turn Off Sleep Timer" else "$mins Minutes",
+                                selected = sleepTimerMinutes == mins,
+                                onSelect = { onSelectSleepTimer(mins) }
+                            )
+                        }
+                    }
+
+                    PlayerSheetType.ERROR_REPORT -> {
+                        Text("Having playback issues with this file?", color = TextPrimary, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("This will send playback diagnostics and server transcode logs to your Jellyfin administrator for inspection.", color = TextMuted, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        TvFocusableCard(onClick = onReportError) {
+                            Surface(color = JellyfinRed, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                                Text("Submit Log & Report Error", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+                            }
+                        }
+                    }
+
+                    else -> {}
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsRowItem(title: String, value: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        color = JellyfinSurfaceVariant,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = icon, contentDescription = null, tint = JellyfinCyan, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(title, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            Text(value, color = JellyfinCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun SelectableOptionItem(title: String, selected: Boolean, onSelect: () -> Unit) {
+    Surface(
+        color = if (selected) JellyfinRed.copy(alpha = 0.25f) else JellyfinSurfaceVariant,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clickable { onSelect() }
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = title,
+                color = if (selected) JellyfinRed else TextPrimary,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 13.sp
+            )
+            if (selected) {
+                Icon(Icons.Default.Check, contentDescription = "Selected", tint = JellyfinRed, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = TextMuted, fontSize = 12.sp)
+        Text(value, color = JellyfinCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun PillButton(text: String, onClick: () -> Unit) {
+    Surface(
+        color = JellyfinSurfaceVariant,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Text(text, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
     }
 }
 

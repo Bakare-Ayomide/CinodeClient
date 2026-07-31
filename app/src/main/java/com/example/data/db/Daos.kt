@@ -77,3 +77,25 @@ interface DownloadDao {
     @Query("DELETE FROM downloads WHERE itemId = :itemId")
     suspend fun deleteDownload(itemId: String)
 }
+
+@Dao
+interface MonnifyDao {
+    @Query("SELECT * FROM monnify_config WHERE id = 1 LIMIT 1")
+    fun getConfigFlow(): Flow<MonnifyConfigEntity?>
+
+    @Query("SELECT * FROM monnify_config WHERE id = 1 LIMIT 1")
+    suspend fun getConfig(): MonnifyConfigEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveConfig(config: MonnifyConfigEntity)
+
+    @Query("SELECT * FROM monnify_transactions ORDER BY paidAt DESC")
+    fun getAllTransactions(): Flow<List<MonnifyTransactionEntity>>
+
+    @Query("SELECT * FROM monnify_transactions WHERE userEmail = :email AND status = 'PAID'")
+    fun getPaidTransactionsForUser(email: String): Flow<List<MonnifyTransactionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTransaction(transaction: MonnifyTransactionEntity)
+}
+

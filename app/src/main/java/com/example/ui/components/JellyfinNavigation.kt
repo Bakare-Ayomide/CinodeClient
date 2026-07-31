@@ -78,19 +78,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 
 fun NavDestination.getIconColor(): Color {
-    return when (this) {
-        NavDestination.HOME -> IconBlue
-        NavDestination.MOVIES -> IconYellow
-        NavDestination.TV_SHOWS -> IconOrange
-        NavDestination.SEARCH -> IconCyan
-        NavDestination.FAVORITES -> IconPink
-        NavDestination.DOWNLOADS -> IconGreen
-        NavDestination.PROFILE -> IconTeal
-        NavDestination.SECURITY -> IconRed
-        NavDestination.SETTINGS -> IconPurple
-        NavDestination.AUTH -> IconAmber
-        NavDestination.ONBOARDING -> IconLime
-    }
+    return JellyfinRed
 }
 
 enum class NavDestination(val title: String, val icon: ImageVector) {
@@ -120,6 +108,8 @@ fun CinodeTopBar(
     onSearchQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val cleanServerName = activeServerName.ifEmpty { "Cinode Server" }
+
     Surface(
         color = JellyfinSurface.copy(alpha = 0.95f),
         modifier = modifier.fillMaxWidth()
@@ -127,82 +117,45 @@ fun CinodeTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Menu Icon + Brand Logo & Server Badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            // Brand Logo (JUST text "CINODE", no 3-line menu, no letter C icon)
+            Column(
+                modifier = Modifier.clickable { onOpenDrawer() }
             ) {
-                IconButton(
-                    onClick = onOpenDrawer,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("topbar_menu_btn")
+                Text(
+                    text = "CINODE",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = JellyfinRed,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp,
+                    letterSpacing = 1.5.sp
+                )
+                // Server status badge
+                TvFocusableCard(
+                    onClick = onOpenServerConnect,
+                    testTag = "server_badge"
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Menu",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(2.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .background(JellyfinRed, CircleShape)
-                        .clickable { onOpenDrawer() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "C",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Column(
-                    modifier = Modifier.clickable { onOpenDrawer() }
-                ) {
-                    Text(
-                        text = "CINODE",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 14.sp,
-                        letterSpacing = 1.sp
-                    )
-                    // Server status badge
-                    TvFocusableCard(
-                        onClick = onOpenServerConnect,
-                        testTag = "server_badge"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(JellyfinSurfaceVariant, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        Box(
                             modifier = Modifier
-                                .background(JellyfinSurfaceVariant, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(Color(0xFF4CAF50), CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = activeServerName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted,
-                                fontSize = 9.sp
-                            )
-                        }
+                                .size(6.dp)
+                                .background(Color(0xFF4CAF50), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = cleanServerName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted,
+                            fontSize = 9.sp
+                        )
                     }
                 }
             }
@@ -365,7 +318,7 @@ fun CinodeDrawerContent(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) destination.getIconColor() else destination.getIconColor().copy(alpha = 0.15f))
+                                .background(if (isSelected) JellyfinRed else JellyfinRed.copy(alpha = 0.2f))
                                 .clickable {
                                     onNavigate(destination)
                                     onCloseDrawer()
@@ -373,7 +326,7 @@ fun CinodeDrawerContent(
                                 .testTag("drawer_icon_${destination.name.lowercase()}"),
                             contentAlignment = Alignment.Center
                         ) {
-                            val iconColor = if (isSelected) Color.White else destination.getIconColor()
+                            val iconColor = if (isSelected) Color.White else JellyfinRed
                             Icon(
                                 imageVector = destination.icon,
                                 contentDescription = destination.title,
@@ -490,12 +443,12 @@ fun CinodeTvNavRail(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) destination.getIconColor() else destination.getIconColor().copy(alpha = 0.15f))
+                            .background(if (isSelected) JellyfinRed else JellyfinRed.copy(alpha = 0.2f))
                             .clickable { onNavigate(destination) }
                             .testTag("rail_icon_${destination.name.lowercase()}"),
                         contentAlignment = Alignment.Center
                     ) {
-                        val iconColor = if (isSelected) Color.White else destination.getIconColor()
+                        val iconColor = if (isSelected) Color.White else JellyfinRed
                         Icon(
                             imageVector = destination.icon,
                             contentDescription = destination.title,

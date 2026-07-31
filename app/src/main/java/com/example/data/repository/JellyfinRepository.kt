@@ -35,12 +35,21 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
+import com.example.data.api.MonnifyService
+import com.example.data.api.MonnifyPaymentService
+import com.example.data.db.MonnifyConfigEntity
+import com.example.data.db.MonnifyDao
+import com.example.data.db.MonnifyTransactionEntity
+
 class JellyfinRepository(
     private val serverDao: ServerDao,
     private val favoriteDao: FavoriteDao,
     private val progressDao: MediaProgressDao,
-    private val downloadDao: DownloadDao
+    private val downloadDao: DownloadDao,
+    private val monnifyDao: MonnifyDao? = null
 ) {
+    private val monnifyService = MonnifyService()
+    val monnifyPaymentService = MonnifyPaymentService(monnifyService)
     private val okHttpClient: OkHttpClient = createUnsafeOkHttpClient()
 
     private val moshi: Moshi = Moshi.Builder()
@@ -48,7 +57,7 @@ class JellyfinRepository(
         .build()
 
     private val retrofit = Retrofit.Builder()
-        .baseUrl("https://cinode.zerolord.com/")
+        .baseUrl(com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org/" })
         .client(okHttpClient)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
@@ -125,7 +134,7 @@ class JellyfinRepository(
     // Connect / Authenticate Server
     suspend fun connectToServer(url: String, username: String, password: String): Result<JellyfinServer> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val fallbackServerUrl = com.example.BuildConfig.JELLYFIN_FALLBACK_URL.ifEmpty { "http://163.245.193.7:8096" }
             val configAdminUser = com.example.BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
             val configAdminPass = com.example.BuildConfig.JELLYFIN_ADMIN_PASS.ifEmpty { "@f33rinimi" }
@@ -148,7 +157,7 @@ class JellyfinRepository(
                 else -> password
             }
 
-            if (url.contains("demo", ignoreCase = true) && !url.contains("zerolord") && !url.contains("163.245")) {
+            if (url.contains("demo", ignoreCase = true) && !url.contains("163.245")) {
                 // Quick Demo Connection
                 val serverId = addServer("Demo Jellyfin Server", formattedUrl, isDemo = true)
                 Result.success(
@@ -172,7 +181,7 @@ class JellyfinRepository(
                     )
                     val userId = response.User?.Id ?: "user_1"
                     val token = response.AccessToken ?: configApiKey
-                    val serverName = if (formattedUrl.contains("zerolord")) "cinode.zerolord.com" else "Jellyfin Server"
+                    val serverName = "Cinode Server"
                     val serverId = addServer(serverName, formattedUrl, userId = userId, token = token, isDemo = false)
                     Result.success(
                         JellyfinServer(
@@ -197,11 +206,11 @@ class JellyfinRepository(
                     )
                     val userId = response.User?.Id ?: "user_1"
                     val token = response.AccessToken ?: configApiKey
-                    val serverId = addServer("cinode (Fallback IP)", fallbackFormatted, userId = userId, token = token, isDemo = false)
+                    val serverId = addServer("Cinode Server (Fallback IP)", fallbackFormatted, userId = userId, token = token, isDemo = false)
                     Result.success(
                         JellyfinServer(
                             id = serverId,
-                            name = "cinode (Fallback IP)",
+                            name = "Cinode Server (Fallback IP)",
                             url = fallbackFormatted,
                             userId = userId,
                             token = token,
@@ -213,13 +222,13 @@ class JellyfinRepository(
             }
         } catch (e: Exception) {
             // Fallback to offline / demo connection mode if network fails
-            val targetUrl = if (url.isBlank()) "https://cinode.zerolord.com/" else url
+            val targetUrl = if (url.isBlank()) "https://demo.jellyfin.org/" else url
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
-            val serverId = addServer("cinode.zerolord.com (Backend Configured)", targetUrl, token = configApiKey, isDemo = false)
+            val serverId = addServer("Cinode Server", targetUrl, token = configApiKey, isDemo = false)
             Result.success(
                 JellyfinServer(
                     id = serverId,
-                    name = "cinode.zerolord.com",
+                    name = "Cinode Server",
                     url = targetUrl,
                     token = configApiKey,
                     isDemo = false,
@@ -236,7 +245,7 @@ class JellyfinRepository(
         serverUrl: String
     ): Result<JellyfinServer> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configAdminUser = com.example.BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
             val configAdminPass = com.example.BuildConfig.JELLYFIN_ADMIN_PASS.ifEmpty { "@f33rinimi" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
@@ -283,7 +292,7 @@ class JellyfinRepository(
 
     suspend fun getUsersList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinUserResponse> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -301,7 +310,7 @@ class JellyfinRepository(
 
     suspend fun createNewUser(name: String, pass: String?, activeServer: JellyfinServer? = null): Result<com.example.data.api.JellyfinUserResponse> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -321,7 +330,7 @@ class JellyfinRepository(
 
     suspend fun deleteUser(userId: String, activeServer: JellyfinServer? = null): Boolean {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -340,7 +349,7 @@ class JellyfinRepository(
 
     suspend fun getActiveSessionsList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinSessionDto> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -358,7 +367,7 @@ class JellyfinRepository(
 
     suspend fun triggerLibraryScan(activeServer: JellyfinServer? = null): Boolean {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -377,7 +386,7 @@ class JellyfinRepository(
 
     suspend fun getMediaFoldersList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinMediaFolderDto> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -396,7 +405,7 @@ class JellyfinRepository(
 
     suspend fun getActivityLogsList(activeServer: JellyfinServer? = null): List<com.example.data.api.JellyfinActivityLogDto> {
         return try {
-            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+            val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
             val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
             val baseUrl = (activeServer?.url?.ifBlank { null } ?: primaryServerUrl).let { if (it.endsWith("/")) it else "$it/" }
             val token = activeServer?.token?.ifEmpty { configApiKey } ?: configApiKey
@@ -431,7 +440,7 @@ class JellyfinRepository(
             )
         }
 
-        val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
+        val primaryServerUrl = com.example.BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://demo.jellyfin.org" }
         val fallbackServerUrl = com.example.BuildConfig.JELLYFIN_FALLBACK_URL.ifEmpty { "http://163.245.193.7:8096" }
         val configApiKey = com.example.BuildConfig.JELLYFIN_API_KEY.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
 
@@ -696,4 +705,46 @@ class JellyfinRepository(
             downloadDao.deleteDownload(itemId)
         }
     }
+
+    // Monnify Gateway Integration Methods
+    val monnifyConfigFlow: Flow<MonnifyConfigEntity?>? = monnifyDao?.getConfigFlow()
+    val allMonnifyTransactionsFlow: Flow<List<MonnifyTransactionEntity>>? = monnifyDao?.getAllTransactions()
+
+    fun getPaidTransactionsForUser(email: String): Flow<List<MonnifyTransactionEntity>>? {
+        return monnifyDao?.getPaidTransactionsForUser(email)
+    }
+
+    suspend fun getMonnifyConfig(): MonnifyConfigEntity {
+        return monnifyDao?.getConfig() ?: MonnifyConfigEntity()
+    }
+
+    suspend fun saveMonnifyConfig(config: MonnifyConfigEntity) {
+        monnifyDao?.saveConfig(config)
+    }
+
+    suspend fun recordMonnifyTransaction(transaction: MonnifyTransactionEntity) {
+        monnifyDao?.insertTransaction(transaction)
+    }
+
+    suspend fun testMonnifyCredentials(apiKey: String, secretKey: String, useSandbox: Boolean): com.example.data.api.MonnifyAuthResponse {
+        return monnifyService.authenticate(apiKey, secretKey, useSandbox)
+    }
+
+    suspend fun initMonnifyTransaction(
+        config: MonnifyConfigEntity,
+        amount: Double,
+        customerName: String,
+        customerEmail: String,
+        itemTitle: String
+    ): com.example.data.api.MonnifyInitResponse {
+        return monnifyService.initializeTransaction(config, amount, customerName, customerEmail, itemTitle)
+    }
+
+    suspend fun verifyMonnifyTransaction(
+        config: MonnifyConfigEntity,
+        paymentRef: String
+    ): com.example.data.api.MonnifyVerifyResponse {
+        return monnifyService.verifyTransaction(config, paymentRef)
+    }
 }
+

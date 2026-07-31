@@ -273,22 +273,17 @@ fun DetailScreen(
                             ) {
                                 Surface(
                                     color = if (isFavorite) JellyfinPurple.copy(alpha = 0.3f) else JellyfinSurfaceVariant,
-                                    shape = RoundedCornerShape(20.dp)
+                                    shape = CircleShape
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Box(
+                                        modifier = Modifier.padding(10.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                             contentDescription = "Favorite",
-                                            tint = if (isFavorite) JellyfinPurple else Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (isFavorite) "Favorited" else "Bookmark",
-                                            color = Color.White,
-                                            fontSize = 12.sp
+                                            tint = if (isFavorite) JellyfinPurple else Color.White,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
@@ -311,54 +306,36 @@ fun DetailScreen(
                                         "DOWNLOADING" -> JellyfinCyan.copy(alpha = 0.2f)
                                         else -> JellyfinSurfaceVariant
                                     },
-                                    shape = RoundedCornerShape(20.dp)
+                                    shape = CircleShape
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Box(
+                                        modifier = Modifier.padding(10.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         when (downloadState?.downloadStatus) {
                                             "COMPLETED" -> {
                                                 Icon(
                                                     imageVector = Icons.Default.CheckCircle,
                                                     contentDescription = "Downloaded",
-                                                    tint = Color(0xFF81C784)
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = "Downloaded",
-                                                    color = Color(0xFF81C784),
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
+                                                    tint = Color(0xFF81C784),
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                             "DOWNLOADING" -> {
                                                 CircularProgressIndicator(
                                                     progress = { (downloadState.progressPercent / 100f) },
-                                                    modifier = Modifier.size(16.dp),
+                                                    modifier = Modifier.size(20.dp),
                                                     color = JellyfinCyan,
                                                     trackColor = Color.White.copy(alpha = 0.2f),
                                                     strokeWidth = 2.dp
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = "${downloadState.progressPercent}%",
-                                                    color = JellyfinCyan,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
                                                 )
                                             }
                                             else -> {
                                                 Icon(
                                                     imageVector = Icons.Default.FileDownload,
                                                     contentDescription = "Download",
-                                                    tint = Color.White
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = "Download",
-                                                    color = Color.White,
-                                                    fontSize = 12.sp
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         }

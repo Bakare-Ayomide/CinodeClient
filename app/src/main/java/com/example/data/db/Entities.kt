@@ -58,3 +58,34 @@ data class DownloadEntity(
     val videoUrl: String = "",
     val downloadedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "monnify_config")
+data class MonnifyConfigEntity(
+    @PrimaryKey val id: Int = 1,
+    val isPaywallEnabled: Boolean = true,
+    val useSandbox: Boolean = true,
+    val apiKey: String = "MK_TEST_SAF789Q2WS",
+    val secretKey: String = "SK_TEST_9988112233",
+    val contractCode: String = "3489201145",
+    val streamPriceNgn: Double = 600.0,
+    val vipPassPriceNgn: Double = 600.0,
+    val paymentMethods: String = "CARD,ACCOUNT_TRANSFER,USSD",
+    val currency: String = "NGN",
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "monnify_transactions")
+data class MonnifyTransactionEntity(
+    @PrimaryKey val paymentRef: String,
+    val itemId: String,
+    val itemTitle: String,
+    val userEmail: String,
+    val amountNgn: Double,
+    val status: String = "PAID", // "PAID", "PENDING", "FAILED"
+    val paymentMethod: String = "CARD", // "CARD", "ACCOUNT_TRANSFER", "USSD"
+    val virtualAccountNo: String = "6034182991",
+    val bankName: String = "Wema Bank / Monnify",
+    val transactionReference: String = "",
+    val paidAt: Long = System.currentTimeMillis()
+)
+

@@ -232,16 +232,30 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
 
     fun setSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
+        if (query.isNotBlank() && _uiState.value.currentDestination != NavDestination.SEARCH) {
+            _uiState.value = _uiState.value.copy(currentDestination = NavDestination.SEARCH)
+        }
         updateLibraryFilter()
     }
 
     private fun updateLibraryFilter() {
         viewModelScope.launch {
             val filter = _uiState.value.selectedFilter
-            val query = _uiState.value.searchQuery
-            var items = repository.getItems(filter.mediaType, query, _uiState.value.activeServer)
+            val query = _uiState.value.searchQuery.trim()
 
-            if (filter == LibraryFilter.FAVORITES) {
+            var items = if (query.isNotBlank()) {
+                val searchSource = if (_allItems.value.isNotEmpty()) _allItems.value else (movies.value + series.value)
+                searchSource.filter { item ->
+                    item.title.contains(query, ignoreCase = true) ||
+                    item.overview.contains(query, ignoreCase = true) ||
+                    item.genres.any { g -> g.contains(query, ignoreCase = true) } ||
+                    item.seriesName?.contains(query, ignoreCase = true) == true
+                }
+            } else {
+                repository.getItems(filter.mediaType, query, _uiState.value.activeServer)
+            }
+
+            if (filter == LibraryFilter.FAVORITES && query.isBlank()) {
                 items = _allItems.value.filter { it.isFavorite }
             }
 

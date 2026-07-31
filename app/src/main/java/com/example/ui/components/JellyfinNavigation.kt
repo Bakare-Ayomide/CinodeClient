@@ -166,7 +166,7 @@ fun CinodeTopBar(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("Search...", color = TextMuted, fontSize = 11.sp) },
+                placeholder = { Text("Search movies...", color = TextMuted, fontSize = 11.sp) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -186,9 +186,8 @@ fun CinodeTopBar(
                 ),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .widthIn(min = 80.dp, max = 160.dp)
-                    .height(40.dp)
+                    .weight(1f)
+                    .height(38.dp)
                     .testTag("topbar_search_input")
             )
 

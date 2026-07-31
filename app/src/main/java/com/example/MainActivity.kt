@@ -303,11 +303,25 @@ fun MainScreenContent(
     // If an item is selected, show DetailScreen
     if (uiState.selectedItem != null) {
         val downloadState = allDownloads.find { it.itemId == uiState.selectedItem.id }
+        val currentItem = uiState.selectedItem
+        val relMov = (if (movies.isNotEmpty()) movies else allItems.filter { it.mediaType == com.example.data.model.MediaType.MOVIE })
+            .filter { it.id != currentItem.id }
+        val relSho = (if (series.isNotEmpty()) series else allItems.filter { it.mediaType == com.example.data.model.MediaType.SERIES })
+            .filter { it.id != currentItem.id }
+        val sugg = allItems.filter { it.id != currentItem.id }.take(6)
+        val moreLike = allItems.filter { other ->
+            other.id != currentItem.id && other.genres.any { g -> currentItem.genres.contains(g) }
+        }.ifEmpty { allItems.filter { it.id != currentItem.id }.takeLast(6) }
+
         DetailScreen(
-            item = uiState.selectedItem,
+            item = currentItem,
             episodes = viewModel.episodes,
-            isFavorite = uiState.selectedItem.isFavorite,
+            isFavorite = currentItem.isFavorite,
             downloadState = downloadState,
+            relatedMovies = relMov,
+            relatedShows = relSho,
+            suggestedForYou = sugg,
+            moreLikeThis = moreLike,
             onBack = { viewModel.clearSelectedItem() },
             onPlay = { item -> viewModel.playMediaWithPaywallCheck(item, isAdminUser) },
             onPlayEpisode = { episode ->
@@ -325,9 +339,10 @@ fun MainScreenContent(
                 )
                 viewModel.playMediaWithPaywallCheck(episodeItem, isAdminUser)
             },
-            onToggleFavorite = { viewModel.toggleFavorite(uiState.selectedItem) },
+            onToggleFavorite = { viewModel.toggleFavorite(currentItem) },
             onStartDownload = { item -> viewModel.startDownload(item) },
-            onDeleteDownload = { itemId -> viewModel.deleteDownload(itemId) }
+            onDeleteDownload = { itemId -> viewModel.deleteDownload(itemId) },
+            onItemClick = { newItem -> viewModel.selectItem(newItem) }
         )
         return
     }
@@ -360,9 +375,18 @@ fun MainScreenContent(
             )
         }
 
+        NavDestination.SEARCH -> {
+            LibraryScreen(
+                itemsList = filteredItems,
+                selectedFilter = LibraryFilter.ALL,
+                onFilterSelect = { filter -> viewModel.setFilter(filter) },
+                onMediaClick = { item -> viewModel.selectItem(item) }
+            )
+        }
+
         NavDestination.MOVIES -> {
             LibraryScreen(
-                itemsList = if (movies.isNotEmpty()) movies else filteredItems,
+                itemsList = if (uiState.searchQuery.isNotBlank()) filteredItems else (if (movies.isNotEmpty()) movies else filteredItems),
                 selectedFilter = LibraryFilter.MOVIES,
                 onFilterSelect = { filter -> viewModel.setFilter(filter) },
                 onMediaClick = { item -> viewModel.selectItem(item) }
@@ -371,7 +395,7 @@ fun MainScreenContent(
 
         NavDestination.TV_SHOWS -> {
             LibraryScreen(
-                itemsList = if (series.isNotEmpty()) series else filteredItems,
+                itemsList = if (uiState.searchQuery.isNotBlank()) filteredItems else (if (series.isNotEmpty()) series else filteredItems),
                 selectedFilter = LibraryFilter.SERIES,
                 onFilterSelect = { filter -> viewModel.setFilter(filter) },
                 onMediaClick = { item -> viewModel.selectItem(item) }

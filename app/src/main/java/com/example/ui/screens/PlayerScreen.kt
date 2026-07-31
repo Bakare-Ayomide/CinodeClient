@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.app.Activity
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.os.Build
 import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -23,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +46,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
@@ -161,6 +167,35 @@ fun PlayerScreen(
     var isCasting by remember { mutableStateOf(false) }
     var connectedDeviceName by remember { mutableStateOf("") }
     var toastMessage by remember { mutableStateOf<String?>(null) }
+    var isFullScreen by remember { mutableStateOf(false) }
+
+    val toggleFullScreen = {
+        val activity = context as? Activity
+        if (!isFullScreen) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            isFullScreen = true
+            toastMessage = "Landscape Fullscreen Mode"
+        } else {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            isFullScreen = false
+            toastMessage = "Standard View Mode"
+        }
+    }
+
+    val enterPipMode = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val activity = context as? Activity
+            try {
+                val params = android.app.PictureInPictureParams.Builder().build()
+                activity?.enterPictureInPictureMode(params)
+                toastMessage = "Entering Picture-in-Picture Mode"
+            } catch (e: Exception) {
+                toastMessage = "PiP mode not available"
+            }
+        } else {
+            toastMessage = "PiP requires Android 8.0 or higher"
+        }
+    }
 
     val showSkipIntro = currentPositionMs in 5000L..90000L
     val showSkipCredits = durationMs > 180000L && currentPositionMs > (durationMs - 150000L)
@@ -287,8 +322,6 @@ fun PlayerScreen(
             AndroidView(
                 factory = { ctx ->
                     VideoView(ctx).apply {
-                        setZOrderMediaOverlay(true)
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
                         val streamUri = android.net.Uri.parse(
                             if (item.videoUrl.isNotEmpty()) item.videoUrl else "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
                         )
@@ -299,7 +332,7 @@ fun PlayerScreen(
                         }
                         setOnPreparedListener { mp ->
                             try {
-                                mp.setVideoScalingMode(android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+                                mp.setVideoScalingMode(android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
                             } catch (e: Exception) {}
                             durationMs = mp.duration.toLong().coerceAtLeast(180000L)
                             mp.start()
@@ -484,6 +517,7 @@ fun PlayerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = {
+                                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                                 onSaveProgress(currentPositionMs, durationMs)
                                 onBack()
                             },
@@ -522,6 +556,32 @@ fun PlayerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        // Picture in Picture Button
+                        IconButton(
+                            onClick = { enterPipMode() },
+                            modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PictureInPicture,
+                                contentDescription = "PiP Mode",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Full Screen Landscape Switch Button
+                        IconButton(
+                            onClick = { toggleFullScreen() },
+                            modifier = Modifier.background(if (isFullScreen) JellyfinRed else JellyfinSurfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                contentDescription = "Full Screen",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
                         // Cast Button
                         IconButton(
                             onClick = {
@@ -535,19 +595,6 @@ fun PlayerScreen(
                                 imageVector = if (isCasting) Icons.Default.CastConnected else Icons.Default.Cast,
                                 contentDescription = "Chromecast",
                                 tint = if (isCasting) JellyfinCyan else Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Watch Party Button
-                        IconButton(
-                            onClick = { activeSheet = PlayerSheetType.WATCH_PARTY },
-                            modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Group,
-                                contentDescription = "Watch Party",
-                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -821,21 +868,25 @@ fun PlayerScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // BOTTOM ACTION TOOLBAR (Subtitles, Audio, Speed, Quality, Aspect, Favorites, Download icon-only, Info, Error)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    // BOTTOM ACTION TOOLBAR (Scrollable LazyRow for complete mobile responsiveness)
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // Subtitle Button
+                        item {
+                            // Subtitles Button
                             PlayerPillButton(
                                 icon = Icons.Default.Subtitles,
                                 label = "Subtitles",
                                 active = subtitlesEnabled,
                                 onClick = { activeSheet = PlayerSheetType.SUBTITLES }
                             )
+                        }
 
+                        item {
                             // Audio Button
                             PlayerPillButton(
                                 icon = Icons.Default.Audiotrack,
@@ -843,7 +894,9 @@ fun PlayerScreen(
                                 active = true,
                                 onClick = { activeSheet = PlayerSheetType.AUDIO }
                             )
+                        }
 
+                        item {
                             // Speed Button
                             PlayerPillButton(
                                 icon = Icons.Default.Speed,
@@ -851,7 +904,9 @@ fun PlayerScreen(
                                 active = playbackSpeed != 1.0f,
                                 onClick = { activeSheet = PlayerSheetType.SPEED }
                             )
+                        }
 
+                        item {
                             // Quality Button
                             PlayerPillButton(
                                 icon = Icons.Default.HighQuality,
@@ -859,7 +914,9 @@ fun PlayerScreen(
                                 active = true,
                                 onClick = { activeSheet = PlayerSheetType.QUALITY }
                             )
+                        }
 
+                        item {
                             // Aspect Ratio Button
                             PlayerPillButton(
                                 icon = Icons.Default.AspectRatio,
@@ -869,27 +926,63 @@ fun PlayerScreen(
                             )
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // Favorite (Icon Only)
+                        item {
+                            // Fullscreen Switcher Pill
+                            PlayerPillButton(
+                                icon = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                label = if (isFullScreen) "Exit Full" else "Fullscreen",
+                                active = isFullScreen,
+                                onClick = { toggleFullScreen() }
+                            )
+                        }
+
+                        item {
+                            // Picture-in-Picture Pill
+                            PlayerPillButton(
+                                icon = Icons.Default.PictureInPicture,
+                                label = "PiP",
+                                active = false,
+                                onClick = { enterPipMode() }
+                            )
+                        }
+
+                        item {
+                            // Watch Party Pill
+                            PlayerPillButton(
+                                icon = Icons.Default.Group,
+                                label = "Party",
+                                active = false,
+                                onClick = { activeSheet = PlayerSheetType.WATCH_PARTY }
+                            )
+                        }
+
+                        item {
+                            // Favorite Button
                             IconButton(
                                 onClick = {
                                     isFavorite = !isFavorite
                                     toastMessage = if (isFavorite) "Added to Favorites" else "Removed from Favorites"
                                 },
-                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(if (isFavorite) JellyfinRed.copy(alpha = 0.3f) else JellyfinSurfaceVariant, CircleShape)
                             ) {
                                 Icon(
                                     imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                     contentDescription = "Favorite",
-                                    tint = if (isFavorite) JellyfinRed else Color.White,
+                                    tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
+                        }
 
-                            // Download Icon Button (Strictly ICON ONLY, NO accompany text)
+                        item {
+                            // Download Icon Button
                             IconButton(
                                 onClick = { toastMessage = "Downloading for offline viewing" },
-                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(JellyfinSurfaceVariant, CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.FileDownload,
@@ -898,21 +991,39 @@ fun PlayerScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
+                        }
 
-                            // Stats / Info
+                        item {
+                            // Stats / Info Button
                             IconButton(
                                 onClick = { activeSheet = PlayerSheetType.STATS },
-                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(JellyfinSurfaceVariant, CircleShape)
                             ) {
-                                Icon(Icons.Default.Info, contentDescription = "Playback Stats", tint = Color.White, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Playback Stats",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
+                        }
 
-                            // Report Error
+                        item {
+                            // Report Error Button
                             IconButton(
                                 onClick = { activeSheet = PlayerSheetType.ERROR_REPORT },
-                                modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(JellyfinSurfaceVariant, CircleShape)
                             ) {
-                                Icon(Icons.Default.ReportProblem, contentDescription = "Report Error", tint = TextMuted, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ReportProblem,
+                                    contentDescription = "Report Error",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }

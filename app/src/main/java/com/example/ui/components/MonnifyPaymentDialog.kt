@@ -103,10 +103,10 @@ fun MonnifyPaymentDialog(
     onPaymentSuccess: (item: JellyfinItem, planType: MonnifyPlanType, paymentRef: String, method: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedPlan by remember { mutableStateOf(MonnifyPlanType.SINGLE_STREAM) }
+    var selectedPlan by remember { mutableStateOf(MonnifyPlanType.VIP_PASS) }
     var selectedChannel by remember { mutableStateOf(MonnifyPaymentChannel.CARD) }
 
-    val activeAmount = if (selectedPlan == MonnifyPlanType.SINGLE_STREAM) config.streamPriceNgn else config.vipPassPriceNgn
+    val activeAmount = 600.0
 
     // Card Form state
     var cardNumber by remember { mutableStateOf("5399 4100 8821 9902") }
@@ -282,9 +282,9 @@ fun MonnifyPaymentDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Step 1: Choose Access Plan
+                // Step 1: Access Plan
                 Text(
-                    text = "1. SELECT ACCESS PLAN",
+                    text = "1. ACCESS PLAN",
                     color = TextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -292,31 +292,16 @@ fun MonnifyPaymentDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Single Movie Stream Plan
-                    PlanCard(
-                        title = "Single Stream",
-                        priceText = "₦${config.streamPriceNgn.toInt()} NGN",
-                        subtitle = "Access to ${item.title}",
-                        isSelected = selectedPlan == MonnifyPlanType.SINGLE_STREAM,
-                        onClick = { selectedPlan = MonnifyPlanType.SINGLE_STREAM },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // VIP All-Access Plan
-                    PlanCard(
-                        title = "VIP All-Access Pass",
-                        priceText = "₦${config.vipPassPriceNgn.toInt()} NGN",
-                        subtitle = "Unlimited movies & series",
-                        isSelected = selectedPlan == MonnifyPlanType.VIP_PASS,
-                        badge = "BEST VALUE",
-                        onClick = { selectedPlan = MonnifyPlanType.VIP_PASS },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                // Single All-Access Plan Card
+                PlanCard(
+                    title = "All Library Access",
+                    priceText = "₦600 NGN",
+                    subtitle = "Unlimited streaming & downloads for all movies and series",
+                    isSelected = true,
+                    badge = "ALL ACCESS",
+                    onClick = { selectedPlan = MonnifyPlanType.VIP_PASS },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 

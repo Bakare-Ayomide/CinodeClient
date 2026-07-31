@@ -61,6 +61,7 @@ import com.example.data.db.DownloadEntity
 import com.example.data.model.Episode
 import com.example.data.model.JellyfinItem
 import com.example.data.model.MediaType
+import com.example.ui.components.MediaPosterCard
 import com.example.ui.components.TvFocusableCard
 import com.example.ui.theme.JellyfinBackground
 import com.example.ui.theme.JellyfinCardBackground
@@ -76,12 +77,17 @@ fun DetailScreen(
     episodes: List<Episode>,
     isFavorite: Boolean,
     downloadState: DownloadEntity? = null,
+    relatedMovies: List<JellyfinItem> = emptyList(),
+    relatedShows: List<JellyfinItem> = emptyList(),
+    suggestedForYou: List<JellyfinItem> = emptyList(),
+    moreLikeThis: List<JellyfinItem> = emptyList(),
     onBack: () -> Unit,
     onPlay: (JellyfinItem) -> Unit,
     onPlayEpisode: (Episode) -> Unit,
     onToggleFavorite: () -> Unit,
     onStartDownload: (JellyfinItem) -> Unit = {},
     onDeleteDownload: (String) -> Unit = {},
+    onItemClick: (JellyfinItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedSeason by remember { mutableStateOf(1) }
@@ -148,7 +154,7 @@ fun DetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 16.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -157,7 +163,7 @@ fun DetailScreen(
                     // Poster Thumbnail (Floating overlay)
                     Box(
                         modifier = Modifier
-                            .width(130.dp)
+                            .width(100.dp)
                             .aspectRatio(2f / 3f)
                             .clip(RoundedCornerShape(12.dp))
                     ) {
@@ -172,15 +178,17 @@ fun DetailScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(20.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = item.title,
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             color = TextPrimary,
                             fontWeight = FontWeight.Black,
-                            fontSize = 22.sp
+                            fontSize = 19.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -498,6 +506,94 @@ fun DetailScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Related Movies Section
+                if (relatedMovies.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Related Movies",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(relatedMovies) { related ->
+                            MediaPosterCard(
+                                item = related,
+                                onClick = { onItemClick(related) },
+                                modifier = Modifier.width(110.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Related Shows Section
+                if (relatedShows.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Related Shows",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(relatedShows) { related ->
+                            MediaPosterCard(
+                                item = related,
+                                onClick = { onItemClick(related) },
+                                modifier = Modifier.width(110.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Suggested For You Section
+                if (suggestedForYou.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Suggested For You",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(suggestedForYou) { suggested ->
+                            MediaPosterCard(
+                                item = suggested,
+                                onClick = { onItemClick(suggested) },
+                                modifier = Modifier.width(110.dp)
+                            )
+                        }
+                    }
+                }
+
+                // More Like This Section
+                if (moreLikeThis.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "More Like This",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(moreLikeThis) { itemLike ->
+                            MediaPosterCard(
+                                item = itemLike,
+                                onClick = { onItemClick(itemLike) },
+                                modifier = Modifier.width(110.dp)
+                            )
                         }
                     }
                 }

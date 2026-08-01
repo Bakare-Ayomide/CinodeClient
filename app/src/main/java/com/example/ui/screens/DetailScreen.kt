@@ -71,6 +71,8 @@ import com.example.ui.theme.JellyfinSurfaceVariant
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 
+import com.example.ui.components.DownloadQualityDialog
+
 @Composable
 fun DetailScreen(
     item: JellyfinItem,
@@ -86,11 +88,27 @@ fun DetailScreen(
     onPlayEpisode: (Episode) -> Unit,
     onToggleFavorite: () -> Unit,
     onStartDownload: (JellyfinItem) -> Unit = {},
+    onStartDownloadWithQuality: (JellyfinItem, String, Episode?) -> Unit = { item, quality, episode -> onStartDownload(item) },
     onDeleteDownload: (String) -> Unit = {},
     onItemClick: (JellyfinItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedSeason by remember { mutableStateOf(1) }
+    var showQualityDialog by remember { mutableStateOf(false) }
+    var itemToDownload by remember { mutableStateOf<Pair<JellyfinItem, Episode?>?>(null) }
+
+    if (showQualityDialog && itemToDownload != null) {
+        val (targetItem, targetEpisode) = itemToDownload!!
+        DownloadQualityDialog(
+            itemTitle = targetEpisode?.title ?: targetItem.title,
+            mediaType = targetItem.mediaType.name,
+            onDismiss = { showQualityDialog = false },
+            onStartDownload = { quality ->
+                onStartDownloadWithQuality(targetItem, quality, targetEpisode)
+                showQualityDialog = false
+            }
+        )
+    }
 
     LazyColumn(
         modifier = modifier
@@ -303,7 +321,8 @@ fun DetailScreen(
                                     if (downloadState?.downloadStatus == "COMPLETED") {
                                         onDeleteDownload(item.id)
                                     } else if (downloadState == null) {
-                                        onStartDownload(item)
+                                        itemToDownload = Pair(item, null)
+                                        showQualityDialog = true
                                     }
                                 },
                                 testTag = "btn_download_detail"

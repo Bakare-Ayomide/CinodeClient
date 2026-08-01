@@ -55,16 +55,34 @@ import com.example.ui.theme.JellyfinSurfaceVariant
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 
+import com.example.data.db.DownloadSettingsEntity
+import com.example.ui.components.SmartDownloadSettingsDialog
+import androidx.compose.material.icons.filled.Download
+
 @Composable
 fun SettingsScreen(
     activeServer: JellyfinServer?,
     deviceMode: DeviceMode,
     onToggleDeviceMode: () -> Unit,
     onOpenServerConnect: () -> Unit,
+    downloadSettings: DownloadSettingsEntity = DownloadSettingsEntity(),
+    onUpdateDownloadSettings: (DownloadSettingsEntity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var defaultQuality by remember { mutableStateOf("4K Ultra HD") }
+    var showSmartSettingsDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+
+    if (showSmartSettingsDialog) {
+        SmartDownloadSettingsDialog(
+            currentSettings = downloadSettings,
+            onDismiss = { showSmartSettingsDialog = false },
+            onSaveSettings = { updated ->
+                onUpdateDownloadSettings(updated)
+                showSmartSettingsDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -263,6 +281,78 @@ fun SettingsScreen(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Smart Downloads Preferences Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = JellyfinCardBackground),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "OFFLINE SMART DOWNLOADS",
+                    color = JellyfinCyan,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(JellyfinSurfaceVariant, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                tint = JellyfinCyan
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Wi-Fi Only & Smart Features",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = if (downloadSettings.wifiOnly) "Wi-Fi Only • Auto-Retry • Smart Next Episode" else "Cellular & Wi-Fi Enabled • Auto-Retry",
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    TvFocusableCard(
+                        onClick = { showSmartSettingsDialog = true },
+                        testTag = "btn_open_smart_downloads_settings"
+                    ) {
+                        Surface(
+                            color = JellyfinCyan.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "Configure",
+                                color = JellyfinCyan,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
                         }
                     }
                 }

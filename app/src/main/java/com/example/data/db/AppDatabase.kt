@@ -11,10 +11,12 @@ import androidx.room.RoomDatabase
         FavoriteEntity::class,
         MediaProgressEntity::class,
         DownloadEntity::class,
+        DownloadSettingsEntity::class,
         MonnifyConfigEntity::class,
-        MonnifyTransactionEntity::class
+        MonnifyTransactionEntity::class,
+        MediaCacheEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,7 +24,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun mediaProgressDao(): MediaProgressDao
     abstract fun downloadDao(): DownloadDao
+    abstract fun downloadSettingsDao(): DownloadSettingsDao
     abstract fun monnifyDao(): MonnifyDao
+    abstract fun mediaCacheDao(): MediaCacheDao
 
     companion object {
         @Volatile

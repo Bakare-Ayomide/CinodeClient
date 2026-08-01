@@ -63,6 +63,8 @@ import com.example.data.model.MediaType
 import com.example.ui.components.ContinueWatchingCard
 import com.example.ui.components.LibraryTileCard
 import com.example.ui.components.MediaPosterCard
+import com.example.ui.components.MediaPosterSkeletonCard
+import com.example.ui.components.SkeletonHeroBanner
 import com.example.ui.components.TvFocusableCard
 import com.example.ui.theme.JellyfinBackground
 import com.example.ui.theme.JellyfinRed
@@ -73,7 +75,7 @@ import kotlinx.coroutines.isActive
 
 @Composable
 fun HomeScreen(
-    heroItem: JellyfinItem,
+    heroItem: JellyfinItem?,
     continueWatchingList: List<MediaProgressEntity>,
     movies: List<JellyfinItem>,
     series: List<JellyfinItem>,
@@ -87,7 +89,7 @@ fun HomeScreen(
 ) {
     // Spotlight carousel combining top movies & TV series posters
     val spotlightItems = remember(heroItem, movies, series) {
-        (listOf(heroItem) + movies + series).distinctBy { it.id }.take(7)
+        (listOfNotNull(heroItem) + movies + series).distinctBy { it.id }.take(7)
     }
     var activeHeroIndex by remember { mutableIntStateOf(0) }
 
@@ -101,7 +103,7 @@ fun HomeScreen(
         }
     }
 
-    val currentHero = spotlightItems.getOrElse(activeHeroIndex) { heroItem }
+    val currentHero = spotlightItems.getOrNull(activeHeroIndex) ?: heroItem
     // Dynamic Jellyfin Section Categories
     val topRatedItems = (allItems.ifEmpty { movies + series }).sortedByDescending { it.rating.toDoubleOrNull() ?: 0.0 }.take(12)
 
@@ -139,21 +141,22 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .heightIn(min = 340.dp, max = 520.dp)
             ) {
-                AnimatedContent(
-                    targetState = currentHero,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "hero_carousel"
-                ) { activeItem ->
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(activeItem.backdropUrl.ifEmpty { activeItem.posterUrl })
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = activeItem.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                if (currentHero != null) {
+                    AnimatedContent(
+                        targetState = currentHero,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "hero_carousel"
+                    ) { activeItem ->
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(activeItem.backdropUrl.ifEmpty { activeItem.posterUrl })
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = activeItem.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
 
                         // Top & Bottom Gradient Shadows
                         Box(
@@ -293,6 +296,9 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+                } else {
+                    SkeletonHeroBanner()
                 }
 
                 // Top Right Action Icons

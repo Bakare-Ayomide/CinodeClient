@@ -71,11 +71,35 @@ interface DownloadDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateDownload(download: DownloadEntity)
 
-    @Query("UPDATE downloads SET progressPercent = :progress, downloadedSizeBytes = :downloadedBytes, downloadStatus = :status WHERE itemId = :itemId")
-    suspend fun updateProgress(itemId: String, progress: Int, downloadedBytes: Long, status: String)
+    @Query("UPDATE downloads SET progressPercent = :progress, downloadedSizeBytes = :downloadedBytes, downloadSpeedBytesPerSec = :speed, etaSeconds = :eta, downloadStatus = :status WHERE itemId = :itemId")
+    suspend fun updateProgressAndSpeed(itemId: String, progress: Int, downloadedBytes: Long, speed: Long, eta: Long, status: String)
+
+    @Query("UPDATE downloads SET downloadStatus = :status WHERE itemId = :itemId")
+    suspend fun updateStatus(itemId: String, status: String)
 
     @Query("DELETE FROM downloads WHERE itemId = :itemId")
     suspend fun deleteDownload(itemId: String)
+
+    @Query("DELETE FROM downloads WHERE seriesName = :seriesName AND seasonNumber = :seasonNumber")
+    suspend fun deleteDownloadsBySeason(seriesName: String, seasonNumber: Int)
+
+    @Query("DELETE FROM downloads WHERE seriesName = :seriesName OR title = :seriesName")
+    suspend fun deleteDownloadsBySeries(seriesName: String)
+
+    @Query("DELETE FROM downloads")
+    suspend fun deleteAllDownloads()
+}
+
+@Dao
+interface DownloadSettingsDao {
+    @Query("SELECT * FROM download_settings WHERE id = 1 LIMIT 1")
+    fun getSettingsFlow(): Flow<DownloadSettingsEntity?>
+
+    @Query("SELECT * FROM download_settings WHERE id = 1 LIMIT 1")
+    suspend fun getSettings(): DownloadSettingsEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveSettings(settings: DownloadSettingsEntity)
 }
 
 @Dao
@@ -97,5 +121,26 @@ interface MonnifyDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: MonnifyTransactionEntity)
+}
+
+@Dao
+interface MediaCacheDao {
+    @Query("SELECT * FROM media_cache ORDER BY cachedAt DESC")
+    fun getAllCachedFlow(): Flow<List<MediaCacheEntity>>
+
+    @Query("SELECT * FROM media_cache ORDER BY cachedAt DESC")
+    suspend fun getAllCached(): List<MediaCacheEntity>
+
+    @Query("SELECT * FROM media_cache WHERE mediaType = :type ORDER BY cachedAt DESC")
+    suspend fun getCachedByType(type: String): List<MediaCacheEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<MediaCacheEntity>)
+
+    @Query("DELETE FROM media_cache WHERE mediaType = :type")
+    suspend fun clearType(type: String)
+
+    @Query("DELETE FROM media_cache")
+    suspend fun clearAll()
 }
 

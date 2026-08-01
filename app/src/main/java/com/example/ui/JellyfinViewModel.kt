@@ -6,13 +6,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.db.AppDatabase
 import com.example.data.db.DownloadEntity
+import com.example.data.db.DownloadSettingsEntity
 import com.example.data.db.MediaProgressEntity
 import com.example.data.model.DeviceMode
 import com.example.data.model.Episode
 import com.example.data.model.JellyfinItem
 import com.example.data.model.JellyfinServer
 import com.example.data.model.MediaType
-import com.example.data.repository.DemoMediaProvider
 import com.example.data.repository.JellyfinRepository
 import com.example.ui.components.NavDestination
 import com.example.ui.screens.LibraryFilter
@@ -59,7 +59,9 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
         db.favoriteDao(),
         db.mediaProgressDao(),
         db.downloadDao(),
-        db.monnifyDao()
+        db.downloadSettingsDao(),
+        db.monnifyDao(),
+        db.mediaCacheDao()
     )
 
     private val _uiState = MutableStateFlow(JellyfinUiState())
@@ -73,6 +75,10 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
 
     val allDownloads: StateFlow<List<DownloadEntity>> = repository.allDownloads
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val downloadSettings: StateFlow<DownloadSettingsEntity> = repository.downloadSettingsFlow
+        .map { it ?: DownloadSettingsEntity() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DownloadSettingsEntity())
 
     val monnifyConfig: StateFlow<MonnifyConfigEntity> = (repository.monnifyConfigFlow ?: MutableStateFlow(null))
         .map { it ?: MonnifyConfigEntity() }
@@ -103,10 +109,11 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     private val _albums = MutableStateFlow<List<JellyfinItem>>(emptyList())
     val albums: StateFlow<List<JellyfinItem>> = _albums.asStateFlow()
 
-    private val _heroItem = MutableStateFlow<JellyfinItem>(DemoMediaProvider.heroItem)
-    val heroItem: StateFlow<JellyfinItem> = _heroItem.asStateFlow()
+    private val _heroItem = MutableStateFlow<JellyfinItem?>(null)
+    val heroItem: StateFlow<JellyfinItem?> = _heroItem.asStateFlow()
 
-    val episodes = DemoMediaProvider.sampleEpisodes
+    private val _seriesEpisodes = MutableStateFlow<List<Episode>>(emptyList())
+    val seriesEpisodes: StateFlow<List<Episode>> = _seriesEpisodes.asStateFlow()
 
     private val _filteredLibraryItems = MutableStateFlow<List<JellyfinItem>>(emptyList())
     val filteredLibraryItems: StateFlow<List<JellyfinItem>> = _filteredLibraryItems.asStateFlow()
@@ -197,7 +204,9 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
 
     fun loadAllServerItems(server: JellyfinServer? = _uiState.value.activeServer) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            if (_allItems.value.isEmpty()) {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+            }
 
             val fetchedAll = repository.getItems(type = null, searchQuery = "", activeServer = server)
             val fetchedMovies = repository.getItems(type = MediaType.MOVIE, searchQuery = "", activeServer = server)
@@ -211,10 +220,16 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             _liveTv.value = if (fetchedLiveTv.isNotEmpty()) fetchedLiveTv else fetchedAll.filter { it.mediaType == MediaType.LIVE_TV }
             _albums.value = if (fetchedAlbums.isNotEmpty()) fetchedAlbums else fetchedAll.filter { it.mediaType == MediaType.MUSIC_ALBUM || it.mediaType == MediaType.MUSIC_TRACK }
 
-            _heroItem.value = _movies.value.firstOrNull() ?: _allItems.value.firstOrNull() ?: DemoMediaProvider.heroItem
+            _heroItem.value = _movies.value.firstOrNull() ?: _allItems.value.firstOrNull()
 
             _uiState.value = _uiState.value.copy(isLoading = false)
             updateLibraryFilter()
+        }
+    }
+
+    fun loadEpisodesForSeries(seriesId: String) {
+        viewModelScope.launch {
+            _seriesEpisodes.value = repository.getEpisodesForSeries(seriesId)
         }
     }
 
@@ -244,12 +259,17 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             val query = _uiState.value.searchQuery.trim()
 
             var items = if (query.isNotBlank()) {
-                val searchSource = if (_allItems.value.isNotEmpty()) _allItems.value else (movies.value + series.value)
-                searchSource.filter { item ->
-                    item.title.contains(query, ignoreCase = true) ||
-                    item.overview.contains(query, ignoreCase = true) ||
-                    item.genres.any { g -> g.contains(query, ignoreCase = true) } ||
-                    item.seriesName?.contains(query, ignoreCase = true) == true
+                val remoteResults = repository.getItems(filter.mediaType, query, _uiState.value.activeServer)
+                if (remoteResults.isNotEmpty()) {
+                    remoteResults
+                } else {
+                    val searchSource = (_allItems.value + movies.value + series.value + liveTv.value + albums.value).distinctBy { it.id }
+                    searchSource.filter { item ->
+                        item.title.contains(query, ignoreCase = true) ||
+                        item.overview.contains(query, ignoreCase = true) ||
+                        item.genres.any { g -> g.contains(query, ignoreCase = true) } ||
+                        item.seriesName?.contains(query, ignoreCase = true) == true
+                    }
                 }
             } else {
                 repository.getItems(filter.mediaType, query, _uiState.value.activeServer)
@@ -378,15 +398,60 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun startDownload(item: JellyfinItem) {
-        viewModelScope.launch {
-            repository.startDownload(getApplication(), item)
-        }
+    fun startDownload(
+        item: JellyfinItem,
+        quality: String = "1080p",
+        seriesName: String? = null,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
+        episodeDetails: Episode? = null
+    ) {
+        repository.startDownload(
+            context = getApplication(),
+            item = item,
+            quality = quality,
+            seriesName = seriesName,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            episodeDetails = episodeDetails
+        )
+    }
+
+    fun pauseDownload(itemId: String) {
+        repository.pauseDownload(itemId)
+    }
+
+    fun resumeDownload(itemId: String) {
+        repository.resumeDownload(getApplication(), itemId)
+    }
+
+    fun cancelDownload(itemId: String) {
+        repository.cancelDownload(getApplication(), itemId)
+    }
+
+    fun retryDownload(itemId: String) {
+        repository.retryDownload(getApplication(), itemId)
     }
 
     fun deleteDownload(itemId: String) {
+        repository.deleteDownload(getApplication(), itemId)
+    }
+
+    fun deleteSeasonDownloads(seriesName: String, seasonNumber: Int) {
+        repository.deleteSeasonDownloads(getApplication(), seriesName, seasonNumber)
+    }
+
+    fun deleteSeriesDownloads(seriesName: String) {
+        repository.deleteSeriesDownloads(getApplication(), seriesName)
+    }
+
+    fun deleteAllDownloads() {
+        repository.deleteAllDownloads(getApplication())
+    }
+
+    fun updateDownloadSettings(settings: DownloadSettingsEntity) {
         viewModelScope.launch {
-            repository.deleteDownload(getApplication(), itemId)
+            repository.saveDownloadSettings(settings)
         }
     }
 

@@ -44,19 +44,41 @@ data class DownloadEntity(
     @PrimaryKey val itemId: String,
     val title: String,
     val overview: String,
-    val mediaType: String,
+    val mediaType: String, // "MOVIE", "SERIES", "EPISODE"
     val posterUrl: String,
     val backdropUrl: String,
     val localFilePath: String,
-    val downloadStatus: String = "DOWNLOADING", // "DOWNLOADING", "COMPLETED", "FAILED"
+    val localPosterPath: String = "",
+    val downloadStatus: String = "DOWNLOADING", // "WAITING", "DOWNLOADING", "PAUSED", "COMPLETED", "FAILED"
     val progressPercent: Int = 0,
     val totalSizeBytes: Long = 0L,
     val downloadedSizeBytes: Long = 0L,
+    val downloadSpeedBytesPerSec: Long = 0L,
+    val etaSeconds: Long = 0L,
     val year: String = "",
     val rating: String = "",
     val resolution: String = "",
+    val quality: String = "1080p", // "Original", "4K", "1080p", "720p", "480p", "360p"
+    val seriesName: String? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val durationMs: Long = 0L,
     val videoUrl: String = "",
-    val downloadedAt: Long = System.currentTimeMillis()
+    val downloadedAt: Long = System.currentTimeMillis(),
+    val lastSyncedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "download_settings")
+data class DownloadSettingsEntity(
+    @PrimaryKey val id: Int = 1,
+    val wifiOnly: Boolean = true,
+    val allowMobileData: Boolean = false,
+    val autoRetryFailed: Boolean = true,
+    val autoDownloadNextEpisode: Boolean = false,
+    val autoDeleteWatched: Boolean = false,
+    val maxSimultaneousDownloads: Int = 2,
+    val maxStorageLimitGb: Int = 50,
+    val defaultQuality: String = "1080p"
 )
 
 @Entity(tableName = "monnify_config")
@@ -87,5 +109,26 @@ data class MonnifyTransactionEntity(
     val bankName: String = "Wema Bank / Monnify",
     val transactionReference: String = "",
     val paidAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "media_cache")
+data class MediaCacheEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val overview: String,
+    val mediaType: String,
+    val posterUrl: String,
+    val backdropUrl: String,
+    val year: String = "2026",
+    val rating: String = "8.8",
+    val durationMs: Long = 0L,
+    val seriesName: String? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val videoUrl: String = "",
+    val genresJson: String = "",
+    val isFavorite: Boolean = false,
+    val watchPositionMs: Long = 0L,
+    val cachedAt: Long = System.currentTimeMillis()
 )
 

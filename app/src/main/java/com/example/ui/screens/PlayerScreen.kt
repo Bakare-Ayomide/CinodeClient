@@ -160,11 +160,25 @@ fun PlayerScreen(
     var audioDelaySeconds by remember { mutableFloatStateOf(0.0f) }
 
     // Gestures states
+    val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager }
+    val initialVol = remember(audioManager) {
+        if (audioManager != null) {
+            val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+            val curVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+            if (maxVol > 0) curVol.toFloat() / maxVol.toFloat() else 0.8f
+        } else 0.8f
+    }
+    val initialBrightness = remember(context) {
+        val activity = context as? Activity
+        val lp = activity?.window?.attributes
+        if (lp != null && lp.screenBrightness >= 0f) lp.screenBrightness else 0.8f
+    }
+
     var gestureOverlayText by remember { mutableStateOf<String?>(null) }
     var gestureOverlayIcon by remember { mutableStateOf<ImageVector?>(null) }
     var isTemporary2x by remember { mutableStateOf(false) }
-    var brightnessLevel by remember { mutableFloatStateOf(0.8f) }
-    var volumeLevel by remember { mutableFloatStateOf(0.8f) }
+    var brightnessLevel by remember { mutableFloatStateOf(initialBrightness) }
+    var volumeLevel by remember { mutableFloatStateOf(initialVol) }
 
     // Seeking states
     var isSeeking by remember { mutableStateOf(false) }
@@ -210,7 +224,7 @@ fun PlayerScreen(
     // Auto hide controls
     LaunchedEffect(showControls, isPlaying, isScreenLocked) {
         if (showControls && isPlaying && !isScreenLocked) {
-            delay(4000)
+            delay(10000)
             showControls = false
         }
     }
@@ -242,25 +256,6 @@ fun PlayerScreen(
         }
     }
 
-    // Playback loop
-    LaunchedEffect(isPlaying, isTemporary2x, playbackSpeed) {
-        val effectiveSpeed = if (isTemporary2x) 2.0f else playbackSpeed
-        while (isPlaying) {
-            delay(1000)
-            currentPositionMs = (currentPositionMs + (1000 * effectiveSpeed).toLong()).coerceAtMost(durationMs)
-            if (currentPositionMs % 5000L == 0L) {
-                onSaveProgress(currentPositionMs, durationMs)
-            }
-            if (currentPositionMs >= durationMs) {
-                if (repeatMode == "One") {
-                    currentPositionMs = 0L
-                } else {
-                    isPlaying = false
-                }
-            }
-        }
-    }
-
     // Initialize Media3 ExoPlayer Engine for fast, buffering-free streaming & local playback
     val exoPlayer = remember(context) {
         ExoPlayer.Builder(context).build()
@@ -287,6 +282,34 @@ fun PlayerScreen(
         exoPlayer.playWhenReady = isPlaying
     }
 
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) {
+                    if (exoPlayer.duration > 0) {
+                        durationMs = exoPlayer.duration
+                    }
+                } else if (state == Player.STATE_ENDED) {
+                    isPlaying = false
+                    onSaveProgress(durationMs, durationMs)
+                    if (repeatMode == "One") {
+                        exoPlayer.seekTo(0)
+                        exoPlayer.play()
+                    }
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
             exoPlayer.play()
@@ -298,6 +321,29 @@ fun PlayerScreen(
     LaunchedEffect(playbackSpeed, isTemporary2x) {
         val speed = if (isTemporary2x) 2.0f else playbackSpeed
         exoPlayer.playbackParameters = PlaybackParameters(speed)
+    }
+
+    // Apply Screen Brightness Gesture
+    LaunchedEffect(brightnessLevel) {
+        val activity = context as? Activity
+        val window = activity?.window
+        if (window != null) {
+            val lp = window.attributes
+            lp.screenBrightness = brightnessLevel.coerceIn(0.01f, 1.0f)
+            window.attributes = lp
+        }
+    }
+
+    // Apply Audio Volume Gesture
+    LaunchedEffect(volumeLevel) {
+        exoPlayer.volume = volumeLevel.coerceIn(0.0f, 1.0f)
+        if (audioManager != null) {
+            val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+            if (maxVol > 0) {
+                val targetVol = (volumeLevel * maxVol).toInt()
+                audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVol, 0)
+            }
+        }
     }
 
     LaunchedEffect(exoPlayer) {
@@ -312,12 +358,6 @@ fun PlayerScreen(
                     onSaveProgress(currentPositionMs, durationMs)
                 }
             }
-        }
-    }
-
-    DisposableEffect(exoPlayer) {
-        onDispose {
-            exoPlayer.release()
         }
     }
 
@@ -437,24 +477,6 @@ fun PlayerScreen(
             }
         }
 
-        // Subtitles Overlay Rendering
-        if (subtitlesEnabled) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = if (showControls) 140.dp else 50.dp)
-                    .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "[ ${selectedSubtitleTrack.takeWhile { it != '[' }} ] Playing ${item.title} • 4K HDR Atmos",
-                    color = Color(0xFFFFE082),
-                    fontSize = subtitleFontSizeSp.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
         // Gesture Action Feedback Popup Indicator
         if (gestureOverlayText != null) {
             Surface(
@@ -518,13 +540,11 @@ fun PlayerScreen(
                         shape = CircleShape,
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier.padding(16.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.LockOpen, contentDescription = "Unlock", tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Unlock Screen", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -602,32 +622,6 @@ fun PlayerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Picture in Picture Button
-                        IconButton(
-                            onClick = { enterPipMode() },
-                            modifier = Modifier.background(JellyfinSurfaceVariant, CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PictureInPicture,
-                                contentDescription = "PiP Mode",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Full Screen Landscape Switch Button
-                        IconButton(
-                            onClick = { toggleFullScreen() },
-                            modifier = Modifier.background(if (isFullScreen) JellyfinRed else JellyfinSurfaceVariant, CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                contentDescription = "Full Screen",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
                         // Cast Button
                         IconButton(
                             onClick = {
@@ -656,21 +650,6 @@ fun PlayerScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = "Lock Screen",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Master Settings Button
-                        IconButton(
-                            onClick = { activeSheet = PlayerSheetType.SETTINGS },
-                            modifier = Modifier
-                                .background(JellyfinRed, CircleShape)
-                                .testTag("player_btn_settings")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -772,7 +751,7 @@ fun PlayerScreen(
                         .fillMaxWidth()
                         .align(Alignment.BottomStart)
                 ) {
-                    // Skip Intro / Skip Credits Floating Pill Buttons
+                    // Skip Intro / Skip Credits Floating Buttons
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -789,24 +768,15 @@ fun PlayerScreen(
                             ) {
                                 Surface(
                                     color = JellyfinCyan,
-                                    shape = RoundedCornerShape(20.dp)
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(36.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+                                    Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Default.FastForward,
                                             contentDescription = "Skip Intro",
                                             tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Skip Intro",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
@@ -824,24 +794,15 @@ fun PlayerScreen(
                             ) {
                                 Surface(
                                     color = JellyfinPurple,
-                                    shape = RoundedCornerShape(20.dp)
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(36.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+                                    Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Default.FastForward,
                                             contentDescription = "Skip Credits",
                                             tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Skip Credits",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
@@ -920,7 +881,7 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         item {
@@ -934,20 +895,10 @@ fun PlayerScreen(
                         }
 
                         item {
-                            // Audio Button
-                            PlayerPillButton(
-                                icon = Icons.Default.Audiotrack,
-                                label = "Audio",
-                                active = true,
-                                onClick = { activeSheet = PlayerSheetType.AUDIO }
-                            )
-                        }
-
-                        item {
                             // Speed Button
                             PlayerPillButton(
                                 icon = Icons.Default.Speed,
-                                label = "${playbackSpeed}x",
+                                label = "Speed",
                                 active = playbackSpeed != 1.0f,
                                 onClick = { activeSheet = PlayerSheetType.SPEED }
                             )
@@ -957,19 +908,9 @@ fun PlayerScreen(
                             // Quality Button
                             PlayerPillButton(
                                 icon = Icons.Default.HighQuality,
-                                label = selectedQuality.takeWhile { it != ' ' },
+                                label = "Quality",
                                 active = true,
                                 onClick = { activeSheet = PlayerSheetType.QUALITY }
-                            )
-                        }
-
-                        item {
-                            // Aspect Ratio Button
-                            PlayerPillButton(
-                                icon = Icons.Default.AspectRatio,
-                                label = selectedAspectRatio,
-                                active = selectedAspectRatio != "Fit",
-                                onClick = { activeSheet = PlayerSheetType.ASPECT_RATIO }
                             )
                         }
 
@@ -977,7 +918,7 @@ fun PlayerScreen(
                             // Fullscreen Switcher Pill
                             PlayerPillButton(
                                 icon = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                label = if (isFullScreen) "Exit Full" else "Fullscreen",
+                                label = "Fullscreen",
                                 active = isFullScreen,
                                 onClick = { toggleFullScreen() }
                             )
@@ -991,36 +932,6 @@ fun PlayerScreen(
                                 active = false,
                                 onClick = { enterPipMode() }
                             )
-                        }
-
-                        item {
-                            // Watch Party Pill
-                            PlayerPillButton(
-                                icon = Icons.Default.Group,
-                                label = "Party",
-                                active = false,
-                                onClick = { activeSheet = PlayerSheetType.WATCH_PARTY }
-                            )
-                        }
-
-                        item {
-                            // Favorite Button
-                            IconButton(
-                                onClick = {
-                                    isFavorite = !isFavorite
-                                    toastMessage = if (isFavorite) "Added to Favorites" else "Removed from Favorites"
-                                },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(if (isFavorite) JellyfinRed.copy(alpha = 0.3f) else JellyfinSurfaceVariant, CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    contentDescription = "Favorite",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
                         }
 
                         item {
@@ -1051,23 +962,6 @@ fun PlayerScreen(
                                 Icon(
                                     imageVector = Icons.Default.Info,
                                     contentDescription = "Playback Stats",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        item {
-                            // Report Error Button
-                            IconButton(
-                                onClick = { activeSheet = PlayerSheetType.ERROR_REPORT },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(JellyfinSurfaceVariant, CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ReportProblem,
-                                    contentDescription = "Report Error",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -1118,29 +1012,18 @@ private fun PlayerPillButton(
     active: Boolean,
     onClick: () -> Unit
 ) {
-    Surface(
-        color = if (active) JellyfinRed.copy(alpha = 0.3f) else JellyfinSurfaceVariant,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.clickable { onClick() }
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(36.dp)
+            .background(if (active) JellyfinRed.copy(alpha = 0.3f) else JellyfinSurfaceVariant, CircleShape)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (active) JellyfinRed else Color.White,
-                modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = label,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (active) JellyfinRed else Color.White,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
@@ -1221,7 +1104,6 @@ private fun PlayerSettingsModal(
 
                 when (type) {
                     PlayerSheetType.SETTINGS -> {
-                        SettingsRowItem("Aspect Ratio", selectedAspectRatio, Icons.Default.AspectRatio) { onSelectAspectRatio("Auto") }
                         SettingsRowItem("Playback Speed", "${playbackSpeed}x", Icons.Default.Speed) { onSelectSpeed(1.0f) }
                         SettingsRowItem("Quality", selectedQuality, Icons.Default.HighQuality) { onSelectQuality("Auto") }
                         SettingsRowItem("Repeat Mode", repeatMode, Icons.Default.Repeat) { onSelectRepeatMode(if (repeatMode == "None") "One" else "None") }

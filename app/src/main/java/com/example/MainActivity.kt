@@ -91,7 +91,7 @@ fun CinodeAppContent(
     continueWatching: List<com.example.data.db.MediaProgressEntity>,
     filteredItems: List<com.example.data.model.JellyfinItem>,
     allItems: List<com.example.data.model.JellyfinItem>,
-    heroItem: com.example.data.model.JellyfinItem,
+    heroItem: com.example.data.model.JellyfinItem?,
     movies: List<com.example.data.model.JellyfinItem>,
     series: List<com.example.data.model.JellyfinItem>,
     allDownloads: List<com.example.data.db.DownloadEntity>,
@@ -292,7 +292,7 @@ fun MainScreenContent(
     continueWatching: List<com.example.data.db.MediaProgressEntity>,
     filteredItems: List<com.example.data.model.JellyfinItem>,
     allItems: List<com.example.data.model.JellyfinItem>,
-    heroItem: com.example.data.model.JellyfinItem,
+    heroItem: com.example.data.model.JellyfinItem?,
     movies: List<com.example.data.model.JellyfinItem>,
     series: List<com.example.data.model.JellyfinItem>,
     allDownloads: List<com.example.data.db.DownloadEntity>,
@@ -300,10 +300,20 @@ fun MainScreenContent(
     isAdminUser: Boolean = false,
     onOpenDrawer: () -> Unit = {}
 ) {
+    val downloadSettings by viewModel.downloadSettings.collectAsStateWithLifecycle()
+
     // If an item is selected, show DetailScreen
     if (uiState.selectedItem != null) {
         val downloadState = allDownloads.find { it.itemId == uiState.selectedItem.id }
         val currentItem = uiState.selectedItem
+        val seriesEpisodes by viewModel.seriesEpisodes.collectAsStateWithLifecycle()
+
+        androidx.compose.runtime.LaunchedEffect(currentItem.id) {
+            if (currentItem.mediaType == com.example.data.model.MediaType.SERIES) {
+                viewModel.loadEpisodesForSeries(currentItem.id)
+            }
+        }
+
         val relMov = (if (movies.isNotEmpty()) movies else allItems.filter { it.mediaType == com.example.data.model.MediaType.MOVIE })
             .filter { it.id != currentItem.id }
         val relSho = (if (series.isNotEmpty()) series else allItems.filter { it.mediaType == com.example.data.model.MediaType.SERIES })
@@ -315,7 +325,7 @@ fun MainScreenContent(
 
         DetailScreen(
             item = currentItem,
-            episodes = viewModel.episodes,
+            episodes = seriesEpisodes,
             isFavorite = currentItem.isFavorite,
             downloadState = downloadState,
             relatedMovies = relMov,
@@ -341,6 +351,13 @@ fun MainScreenContent(
             },
             onToggleFavorite = { viewModel.toggleFavorite(currentItem) },
             onStartDownload = { item -> viewModel.startDownload(item) },
+            onStartDownloadWithQuality = { item, quality, episode ->
+                viewModel.startDownload(
+                    item = item,
+                    quality = quality,
+                    episodeDetails = episode
+                )
+            },
             onDeleteDownload = { itemId -> viewModel.deleteDownload(itemId) },
             onItemClick = { newItem -> viewModel.selectItem(newItem) }
         )
@@ -416,6 +433,13 @@ fun MainScreenContent(
                 downloads = allDownloads,
                 onPlayMedia = { item -> viewModel.playMediaWithPaywallCheck(item, isAdminUser) },
                 onDeleteDownload = { itemId -> viewModel.deleteDownload(itemId) },
+                onPauseDownload = { itemId -> viewModel.pauseDownload(itemId) },
+                onResumeDownload = { itemId -> viewModel.resumeDownload(itemId) },
+                onCancelDownload = { itemId -> viewModel.cancelDownload(itemId) },
+                onRetryDownload = { itemId -> viewModel.retryDownload(itemId) },
+                onDeleteSeasonDownloads = { series, season -> viewModel.deleteSeasonDownloads(series, season) },
+                onDeleteSeriesDownloads = { series -> viewModel.deleteSeriesDownloads(series) },
+                onDeleteAllDownloads = { viewModel.deleteAllDownloads() },
                 onExploreLibrary = { viewModel.navigateTo(NavDestination.MOVIES) }
             )
         }
@@ -435,7 +459,9 @@ fun MainScreenContent(
                 activeServer = uiState.activeServer,
                 deviceMode = uiState.deviceMode,
                 onToggleDeviceMode = { viewModel.toggleDeviceMode() },
-                onOpenServerConnect = { viewModel.openServerConnectModal() }
+                onOpenServerConnect = { viewModel.openServerConnectModal() },
+                downloadSettings = downloadSettings,
+                onUpdateDownloadSettings = { updated -> viewModel.updateDownloadSettings(updated) }
             )
         }
 

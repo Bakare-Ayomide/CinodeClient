@@ -402,3 +402,56 @@ fun LibraryTileCard(
         }
     }
 }
+
+@Composable
+fun MediaPosterSkeletonCard(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = JellyfinCardBackground.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier
+            .width(130.dp)
+            .aspectRatio(2f / 3f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.05f),
+                            Color.White.copy(alpha = 0.15f),
+                            Color.White.copy(alpha = 0.05f)
+                        )
+                    )
+                )
+        )
+    }
+}
+
+@Composable
+fun SkeletonHeroBanner(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(340.dp)
+            .background(JellyfinCardBackground)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.02f),
+                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.02f)
+                        )
+                    )
+                )
+        )
+    }
+}

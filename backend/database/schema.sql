@@ -64,9 +64,33 @@ CREATE TABLE IF NOT EXISTS `system_config` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed Default Admin & System Settings
+-- Seed Default System Configuration Credentials & Secrets
 INSERT INTO `system_config` (`config_key`, `config_value`) VALUES
-('STREAM_PRICE_NGN', '2500.00'),
+('JELLYFIN_SERVER_URL', 'https://cinode.zerolord.com'),
+('JELLYFIN_FALLBACK_URL', 'http://163.245.193.7:8096'),
+('JELLYFIN_ADMIN_USER', 'duwit'),
+('JELLYFIN_ADMIN_PASS', '@f33rinimi'),
+('JELLYFIN_API_KEY', '79ee2e15ee1f47fd881188ef4da13391'),
+('MONNIFY_API_KEY', 'MK_PROD_123456789'),
+('MONNIFY_SECRET_KEY', 'SK_PROD_987654321'),
 ('MONNIFY_CONTRACT_CODE', '1234567890'),
+('MONNIFY_USE_SANDBOX', 'true'),
+('STREAM_PRICE_NGN', '600.00'),
+('VIP_PASS_PRICE_NGN', '600.00'),
+('JWT_SECRET', 'cinjelly_jwt_secret_key_2026_super_secure'),
+('DB_HOST', '105.113.98.181'),
+('DB_NAME', 'zerolord_cinback'),
+('DB_USER', 'zerolord_cinback'),
+('DB_PASS', '@f33rinimi'),
 ('ALLOW_PUBLIC_SIGNUP', '1')
 ON DUPLICATE KEY UPDATE `config_value` = VALUES(`config_value`);
+
+-- Seed Current Jellyfin Users into MySQL Database
+INSERT INTO `users` (`username`, `email`, `password_hash`, `full_name`, `jellyfin_user_id`, `is_admin`, `is_premium`) VALUES
+('duwit', 'duwit@cinode.zerolord.com', '$2y$10$wE1Vp2G8A4GkUj5m19J32uA8Xg2Kx5lE6D5T1Z0Y9X8W7V6U5T4S3', 'Duwit Admin', '8699065ad11d490894f712887ccc9ce1', 1, 1),
+('Oyinpepper', 'oyinpepper@cinode.zerolord.com', '$2y$10$wE1Vp2G8A4GkUj5m19J32uA8Xg2Kx5lE6D5T1Z0Y9X8W7V6U5T4S3', 'Oyinpepper User', '94c997dad1fe4563bb2a9c7cabb42468', 0, 1),
+('YungObalola', 'yungobalola@cinode.zerolord.com', '$2y$10$wE1Vp2G8A4GkUj5m19J32uA8Xg2Kx5lE6D5T1Z0Y9X8W7V6U5T4S3', 'YungObalola User', 'c462886abc8e4f8589cb9f4063176364', 0, 1)
+ON DUPLICATE KEY UPDATE 
+    `jellyfin_user_id` = VALUES(`jellyfin_user_id`),
+    `is_admin` = VALUES(`is_admin`),
+    `is_premium` = VALUES(`is_premium`);

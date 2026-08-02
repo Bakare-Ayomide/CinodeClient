@@ -76,11 +76,11 @@ fun ServerConnectScreen(
     errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var serverUrl by remember { mutableStateOf("https://demo.jellyfin.org") }
-    var useApiKey by remember { mutableStateOf(false) }
-    var username by remember { mutableStateOf("admin") }
-    var password by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
+    var useApiKey by remember { mutableStateOf(true) }
+    var username by remember { mutableStateOf("duwit") }
+    var password by remember { mutableStateOf("@f33rinimi") }
+    var apiKey by remember { mutableStateOf("79ee2e15ee1f47fd881188ef4da13391") }
 
     Box(
         modifier = modifier

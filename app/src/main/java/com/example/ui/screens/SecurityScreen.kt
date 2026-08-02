@@ -130,7 +130,7 @@ fun SecurityScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
-    val adminEnvUser = BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+    val adminEnvUser = try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" }
 
     val isAdmin = currentUserName.equals(adminEnvUser, ignoreCase = true) ||
             currentUserEmail.startsWith(adminEnvUser, ignoreCase = true) ||
@@ -824,7 +824,7 @@ private fun AdminUsersTab(
     onOpenCreateUser: () -> Unit,
     onDeleteUser: (String) -> Unit
 ) {
-    val adminEnvUser = BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+    val adminEnvUser = try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" }
     val displayUsers = if (usersList.isNotEmpty()) usersList else listOf(
         JellyfinUserResponse(Id = "admin_1", Name = adminEnvUser, HasPassword = true),
         JellyfinUserResponse(Id = "user_2", Name = "Alex Morgan", HasPassword = true),
@@ -944,7 +944,7 @@ private fun AdminSessionsTab(
     val displaySessions = if (sessionsList.isNotEmpty()) sessionsList else listOf(
         JellyfinSessionDto(
             Id = "sess_1",
-            UserName = BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" },
+            UserName = try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" },
             Client = "Android TV Client",
             DeviceName = "Chromecast TV 4K",
             RemoteEndPoint = "192.168.1.45"
@@ -1065,7 +1065,7 @@ private fun AdminSystemTab(
     onPurgeCache: () -> Unit
 ) {
     val displayLogs = if (activityLogs.isNotEmpty()) activityLogs.map { "${it.Date ?: ""} ${it.Name}: ${it.Overview ?: ""}" } else listOf(
-        "[03:15:10] AUTH SUCCESS: Admin user '${BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }}' authenticated via API key.",
+        "[03:15:10] AUTH SUCCESS: Admin user '${try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" }}' authenticated via API key.",
         "[03:00:00] MEDIA SYNC: Fetched 4K Movies & Series library catalog",
         "[02:45:22] HARDWARE TRANSCODE: NVENC H.265 stream started",
         "[02:30:00] SYSTEM: SSL/TLS Certificate validated (https://demo.jellyfin.org)"

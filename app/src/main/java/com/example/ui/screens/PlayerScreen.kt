@@ -876,96 +876,74 @@ fun PlayerScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // BOTTOM ACTION TOOLBAR (Scrollable LazyRow for complete mobile responsiveness)
-                    LazyRow(
+                    // BOTTOM ACTION TOOLBAR (Well-fitted remaining icons)
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        item {
-                            // Subtitles Button
-                            PlayerPillButton(
-                                icon = Icons.Default.Subtitles,
-                                label = "Subtitles",
-                                active = subtitlesEnabled,
-                                onClick = { activeSheet = PlayerSheetType.SUBTITLES }
+                        // Subtitles Button
+                        PlayerPillButton(
+                            icon = Icons.Default.Subtitles,
+                            label = "Subtitles",
+                            active = subtitlesEnabled,
+                            onClick = { activeSheet = PlayerSheetType.SUBTITLES }
+                        )
+
+                        // Audio Button
+                        PlayerPillButton(
+                            icon = Icons.Default.Audiotrack,
+                            label = "Audio",
+                            active = false,
+                            onClick = { activeSheet = PlayerSheetType.AUDIO }
+                        )
+
+                        // Speed Button
+                        PlayerPillButton(
+                            icon = Icons.Default.Speed,
+                            label = "Speed",
+                            active = playbackSpeed != 1.0f,
+                            onClick = { activeSheet = PlayerSheetType.SPEED }
+                        )
+
+                        // Quality Button
+                        PlayerPillButton(
+                            icon = Icons.Default.HighQuality,
+                            label = "Quality",
+                            active = true,
+                            onClick = { activeSheet = PlayerSheetType.QUALITY }
+                        )
+
+                        // Download Icon Button
+                        IconButton(
+                            onClick = { toastMessage = "Downloading for offline viewing" },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(JellyfinSurfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FileDownload,
+                                contentDescription = "Download",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
-                        item {
-                            // Speed Button
-                            PlayerPillButton(
-                                icon = Icons.Default.Speed,
-                                label = "Speed",
-                                active = playbackSpeed != 1.0f,
-                                onClick = { activeSheet = PlayerSheetType.SPEED }
+                        // Stats / Info Button
+                        IconButton(
+                            onClick = { activeSheet = PlayerSheetType.STATS },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(JellyfinSurfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Playback Stats",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
                             )
-                        }
-
-                        item {
-                            // Quality Button
-                            PlayerPillButton(
-                                icon = Icons.Default.HighQuality,
-                                label = "Quality",
-                                active = true,
-                                onClick = { activeSheet = PlayerSheetType.QUALITY }
-                            )
-                        }
-
-                        item {
-                            // Fullscreen Switcher Pill
-                            PlayerPillButton(
-                                icon = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                label = "Fullscreen",
-                                active = isFullScreen,
-                                onClick = { toggleFullScreen() }
-                            )
-                        }
-
-                        item {
-                            // Picture-in-Picture Pill
-                            PlayerPillButton(
-                                icon = Icons.Default.PictureInPicture,
-                                label = "PiP",
-                                active = false,
-                                onClick = { enterPipMode() }
-                            )
-                        }
-
-                        item {
-                            // Download Icon Button
-                            IconButton(
-                                onClick = { toastMessage = "Downloading for offline viewing" },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(JellyfinSurfaceVariant, CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FileDownload,
-                                    contentDescription = "Download",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        item {
-                            // Stats / Info Button
-                            IconButton(
-                                onClick = { activeSheet = PlayerSheetType.STATS },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(JellyfinSurfaceVariant, CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Playback Stats",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
                         }
                     }
                 }

@@ -118,11 +118,27 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     private val _filteredLibraryItems = MutableStateFlow<List<JellyfinItem>>(emptyList())
     val filteredLibraryItems: StateFlow<List<JellyfinItem>> = _filteredLibraryItems.asStateFlow()
 
+    private val _adminUsers = MutableStateFlow<List<com.example.data.api.JellyfinUserResponse>>(emptyList())
+    val adminUsers: StateFlow<List<com.example.data.api.JellyfinUserResponse>> = _adminUsers.asStateFlow()
+
+    private val _adminSessions = MutableStateFlow<List<com.example.data.api.JellyfinSessionDto>>(emptyList())
+    val adminSessions: StateFlow<List<com.example.data.api.JellyfinSessionDto>> = _adminSessions.asStateFlow()
+
+    private val _adminMediaFolders = MutableStateFlow<List<com.example.data.api.JellyfinMediaFolderDto>>(emptyList())
+    val adminMediaFolders: StateFlow<List<com.example.data.api.JellyfinMediaFolderDto>> = _adminMediaFolders.asStateFlow()
+
+    private val _adminActivityLogs = MutableStateFlow<List<com.example.data.api.JellyfinActivityLogDto>>(emptyList())
+    val adminActivityLogs: StateFlow<List<com.example.data.api.JellyfinActivityLogDto>> = _adminActivityLogs.asStateFlow()
+
+    private val _isAdminLoading = MutableStateFlow(false)
+    val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
+
     private val prefs = application.getSharedPreferences("cinode_user_session_prefs", Context.MODE_PRIVATE)
 
     init {
         restoreUserSession()
         loadInitialServer()
+        fetchAdminDashboardData()
         viewModelScope.launch {
             monnifyConfig.collect { config ->
                 repository.monnifyPaymentService.initializeGateway(config)
@@ -224,6 +240,7 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
 
             _uiState.value = _uiState.value.copy(isLoading = false)
             updateLibraryFilter()
+            fetchAdminDashboardData()
         }
     }
 
@@ -536,21 +553,6 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     fun loginGuest() {
         login("guest@jellyfin.demo", "Guest User")
     }
-
-    private val _adminUsers = MutableStateFlow<List<com.example.data.api.JellyfinUserResponse>>(emptyList())
-    val adminUsers: StateFlow<List<com.example.data.api.JellyfinUserResponse>> = _adminUsers.asStateFlow()
-
-    private val _adminSessions = MutableStateFlow<List<com.example.data.api.JellyfinSessionDto>>(emptyList())
-    val adminSessions: StateFlow<List<com.example.data.api.JellyfinSessionDto>> = _adminSessions.asStateFlow()
-
-    private val _adminMediaFolders = MutableStateFlow<List<com.example.data.api.JellyfinMediaFolderDto>>(emptyList())
-    val adminMediaFolders: StateFlow<List<com.example.data.api.JellyfinMediaFolderDto>> = _adminMediaFolders.asStateFlow()
-
-    private val _adminActivityLogs = MutableStateFlow<List<com.example.data.api.JellyfinActivityLogDto>>(emptyList())
-    val adminActivityLogs: StateFlow<List<com.example.data.api.JellyfinActivityLogDto>> = _adminActivityLogs.asStateFlow()
-
-    private val _isAdminLoading = MutableStateFlow(false)
-    val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
     fun fetchAdminDashboardData() {
         viewModelScope.launch {

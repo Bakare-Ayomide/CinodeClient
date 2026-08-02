@@ -156,7 +156,7 @@ fun CinodeAppContent(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val adminEnvUser = com.example.BuildConfig.JELLYFIN_ADMIN_USER.ifEmpty { "duwit" }
+    val adminEnvUser = try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" }
     val isAdminUser = uiState.currentUserName.equals(adminEnvUser, ignoreCase = true) ||
             uiState.currentUserEmail.startsWith(adminEnvUser, ignoreCase = true) ||
             uiState.currentUserName.contains("duwit", ignoreCase = true) ||

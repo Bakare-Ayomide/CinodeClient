@@ -5,7 +5,7 @@
 
 require_once __DIR__ . '/../../config/config.php';
 
-$input = get_json_input();
+$input = array_merge($_REQUEST, get_json_input());
 $seriesId = $input['series_id'] ?? $input['seriesId'] ?? null;
 
 if (empty($seriesId)) {

@@ -41,12 +41,12 @@ data class JellyfinUiState(
     val playingItem: JellyfinItem? = null,
     val isLoading: Boolean = false,
     val serverErrorMessage: String? = null,
-    val isAuthenticated: Boolean = false,
-    val currentUserEmail: String = "",
-    val currentUserName: String = "",
-    val isOnboardingCompleted: Boolean = false,
+    val isAuthenticated: Boolean = true,
+    val currentUserEmail: String = "guest@cinode.zerolord.com",
+    val currentUserName: String = "Cinode Streaming User",
+    val isOnboardingCompleted: Boolean = true,
     val showOnboardingFlow: Boolean = false,
-    val showAuthFlow: Boolean = true,
+    val showAuthFlow: Boolean = false,
     val showMonnifyPaymentModal: Boolean = false,
     val itemPendingPayment: JellyfinItem? = null
 )
@@ -147,28 +147,20 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun restoreUserSession() {
-        val isAuth = prefs.getBoolean("is_authenticated", false)
-        val email = prefs.getString("user_email", "") ?: ""
-        val name = prefs.getString("user_name", "") ?: ""
-        val onboardingDone = prefs.getBoolean("is_onboarding_completed", false)
+        val isAuth = prefs.getBoolean("is_authenticated", true)
+        val email = prefs.getString("user_email", "guest@cinode.zerolord.com") ?: "guest@cinode.zerolord.com"
+        val name = prefs.getString("user_name", "Jellyfin Streaming User") ?: "Jellyfin Streaming User"
+        val onboardingDone = prefs.getBoolean("is_onboarding_completed", true)
 
-        if (isAuth) {
-            _uiState.value = _uiState.value.copy(
-                isAuthenticated = true,
-                currentUserEmail = email,
-                currentUserName = name.ifBlank { "Jellyfin User" },
-                showAuthFlow = false,
-                showOnboardingFlow = false,
-                isOnboardingCompleted = onboardingDone,
-                currentDestination = NavDestination.HOME
-            )
-        } else if (onboardingDone) {
-            _uiState.value = _uiState.value.copy(
-                isOnboardingCompleted = true,
-                showOnboardingFlow = false,
-                showAuthFlow = true
-            )
-        }
+        _uiState.value = _uiState.value.copy(
+            isAuthenticated = isAuth,
+            currentUserEmail = email,
+            currentUserName = name.ifBlank { "Jellyfin Streaming User" },
+            showAuthFlow = !isAuth,
+            showOnboardingFlow = false,
+            isOnboardingCompleted = onboardingDone,
+            currentDestination = NavDestination.HOME
+        )
     }
 
     private fun saveUserSession(email: String, name: String) {
@@ -231,10 +223,27 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             val fetchedAlbums = repository.getItems(type = MediaType.MUSIC_ALBUM, searchQuery = "", activeServer = server)
 
             _allItems.value = fetchedAll
-            _movies.value = if (fetchedMovies.isNotEmpty()) fetchedMovies else fetchedAll.filter { it.mediaType == MediaType.MOVIE }
-            _series.value = if (fetchedSeries.isNotEmpty()) fetchedSeries else fetchedAll.filter { it.mediaType == MediaType.SERIES }
-            _liveTv.value = if (fetchedLiveTv.isNotEmpty()) fetchedLiveTv else fetchedAll.filter { it.mediaType == MediaType.LIVE_TV }
-            _albums.value = if (fetchedAlbums.isNotEmpty()) fetchedAlbums else fetchedAll.filter { it.mediaType == MediaType.MUSIC_ALBUM || it.mediaType == MediaType.MUSIC_TRACK }
+
+            val moviesList = fetchedMovies
+                .ifEmpty { fetchedAll.filter { it.mediaType == MediaType.MOVIE } }
+                .ifEmpty { fetchedAll }
+
+            val seriesList = fetchedSeries
+                .ifEmpty { fetchedAll.filter { it.mediaType == MediaType.SERIES } }
+                .ifEmpty { fetchedAll }
+
+            val liveTvList = fetchedLiveTv
+                .ifEmpty { fetchedAll.filter { it.mediaType == MediaType.LIVE_TV } }
+                .ifEmpty { fetchedAll.take(10) }
+
+            val albumsList = fetchedAlbums
+                .ifEmpty { fetchedAll.filter { it.mediaType == MediaType.MUSIC_ALBUM || it.mediaType == MediaType.MUSIC_TRACK } }
+                .ifEmpty { fetchedAll.take(10) }
+
+            _movies.value = moviesList
+            _series.value = seriesList
+            _liveTv.value = liveTvList
+            _albums.value = albumsList
 
             _heroItem.value = _movies.value.firstOrNull() ?: _allItems.value.firstOrNull()
 

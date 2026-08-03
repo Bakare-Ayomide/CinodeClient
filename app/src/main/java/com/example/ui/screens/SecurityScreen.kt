@@ -825,11 +825,7 @@ private fun AdminUsersTab(
     onDeleteUser: (String) -> Unit
 ) {
     val adminEnvUser = try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" }
-    val displayUsers = if (usersList.isNotEmpty()) usersList else listOf(
-        JellyfinUserResponse(Id = "admin_1", Name = adminEnvUser, HasPassword = true),
-        JellyfinUserResponse(Id = "user_2", Name = "Alex Morgan", HasPassword = true),
-        JellyfinUserResponse(Id = "user_3", Name = "Demo User", HasPassword = false)
-    )
+    val displayUsers = usersList
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -941,22 +937,7 @@ private fun AdminSessionsTab(
     sessionsList: List<JellyfinSessionDto>,
     onLogoutSession: (String) -> Unit
 ) {
-    val displaySessions = if (sessionsList.isNotEmpty()) sessionsList else listOf(
-        JellyfinSessionDto(
-            Id = "sess_1",
-            UserName = try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" },
-            Client = "Android TV Client",
-            DeviceName = "Chromecast TV 4K",
-            RemoteEndPoint = "192.168.1.45"
-        ),
-        JellyfinSessionDto(
-            Id = "sess_2",
-            UserName = "Alex Morgan",
-            Client = "Web Player",
-            DeviceName = "Chrome Desktop",
-            RemoteEndPoint = "192.168.1.112"
-        )
-    )
+    val displaySessions = sessionsList
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Active Server Sessions & Connections (${displaySessions.size})", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
@@ -1010,12 +991,7 @@ private fun AdminLibrariesTab(
     mediaFolders: List<JellyfinMediaFolderDto>,
     onTriggerScan: () -> Unit
 ) {
-    val displayFolders = if (mediaFolders.isNotEmpty()) mediaFolders else listOf(
-        JellyfinMediaFolderDto(Id = "lib_1", Name = "Movies Catalog", CollectionType = "movies"),
-        JellyfinMediaFolderDto(Id = "lib_2", Name = "TV Shows & Series", CollectionType = "tvshows"),
-        JellyfinMediaFolderDto(Id = "lib_3", Name = "Music & Albums", CollectionType = "music"),
-        JellyfinMediaFolderDto(Id = "lib_4", Name = "Live TV Channels", CollectionType = "livetv")
-    )
+    val displayFolders = mediaFolders
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -1064,12 +1040,7 @@ private fun AdminSystemTab(
     activityLogs: List<JellyfinActivityLogDto>,
     onPurgeCache: () -> Unit
 ) {
-    val displayLogs = if (activityLogs.isNotEmpty()) activityLogs.map { "${it.Date ?: ""} ${it.Name}: ${it.Overview ?: ""}" } else listOf(
-        "[03:15:10] AUTH SUCCESS: Admin user '${try { BuildConfig.JELLYFIN_ADMIN_USER } catch (e: Throwable) { "duwit" }.ifEmpty { "duwit" }}' authenticated via API key.",
-        "[03:00:00] MEDIA SYNC: Fetched 4K Movies & Series library catalog",
-        "[02:45:22] HARDWARE TRANSCODE: NVENC H.265 stream started",
-        "[02:30:00] SYSTEM: SSL/TLS Certificate validated (https://demo.jellyfin.org)"
-    )
+    val displayLogs = activityLogs.map { "${it.Date ?: ""} ${it.Name}: ${it.Overview ?: ""}" }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1302,11 +1273,7 @@ private fun AdminTranscoderTab(
 private fun AdminApiKeysTab(
     onGenerateKey: () -> Unit
 ) {
-    val sampleKeys = listOf(
-        Triple("cinode_api_key_live_99", "Android Client Integration", "Full Admin Scope"),
-        Triple("cinode_api_key_read_42", "Home Assistant Automation", "Read Only Scope"),
-        Triple("cinode_api_key_sync_17", "Metadata Scraper Bot", "Library Write Scope")
-    )
+    val sampleKeys = emptyList<Triple<String, String, String>>()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(

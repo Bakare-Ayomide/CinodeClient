@@ -142,6 +142,7 @@ interface JellyfinApiService {
         @Query("ParentId") parentId: String? = null,
         @Query("IncludeItemTypes") includeItemTypes: String? = null,
         @Query("SearchTerm") searchTerm: String? = null,
+        @Query("Filters") filters: String? = null,
         @Query("Recursive") recursive: Boolean = true,
         @Query("Fields") fields: String = "Overview,Genres,CommunityRating,ProductionYear,RunTimeTicks,SeriesName,UserData",
         @Query("Limit") limit: Int = 100

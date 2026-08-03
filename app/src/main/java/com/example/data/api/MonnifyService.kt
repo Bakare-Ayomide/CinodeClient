@@ -38,7 +38,7 @@ data class MonnifyVerifyResponse(
 class MonnifyService {
 
     private fun getBackendUrl(): String {
-        val configured = com.example.BuildConfig.CINJELLY_BACKEND_URL.ifEmpty { "https://cinode.zerolord.com/backend/api/" }
+        val configured = com.example.BuildConfig.CINJELLY_BACKEND_URL.ifEmpty { "https://cinback.zerolord.com/api/" }
         return if (configured.endsWith("/")) configured else "$configured/"
     }
 
@@ -62,9 +62,9 @@ class MonnifyService {
         planTitle: String,
         amountNgn: Double
     ): MonnifyInitResponse {
-        val dummyConfig = MonnifyConfigEntity()
+        val defaultConfig = MonnifyConfigEntity()
         return initializeTransaction(
-            config = dummyConfig,
+            config = defaultConfig,
             amount = amountNgn,
             customerName = customerName,
             customerEmail = customerEmail,

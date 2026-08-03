@@ -8,7 +8,6 @@ import com.example.data.api.BackendLoginRequest
 import com.example.data.api.BackendSignupRequest
 import com.example.data.api.CreateUserByNameRequest
 import com.example.data.api.JellyfinActivityLogDto
-import com.example.data.api.JellyfinApiService
 import com.example.data.api.JellyfinMediaFolderDto
 import com.example.data.api.JellyfinSessionDto
 import com.example.data.api.JellyfinUserResponse
@@ -116,17 +115,6 @@ class JellyfinRepository(
             .build()
             .create(BackendApiService::class.java)
     }
-
-    private val jellyfinApiService: JellyfinApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl("https://cinode.zerolord.com/")
-            .client(okHttpClient)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
-            .create(JellyfinApiService::class.java)
-    }
-
-    private val authHeader = "MediaBrowser Client=\"Cinode Android\", Device=\"Android\", DeviceId=\"cinode_android_client\", Version=\"1.0.0\""
 
     val savedServers: Flow<List<JellyfinServer>> = serverDao.getAllServers().map { entities ->
         entities.map { entity ->
@@ -383,25 +371,14 @@ class JellyfinRepository(
 
     suspend fun getMediaFoldersList(activeServer: JellyfinServer?): List<JellyfinMediaFolderDto> {
         return withContext(Dispatchers.IO) {
-            val server = activeServer ?: getActiveServer()
-            val rawServerUrl = server?.url ?: try { BuildConfig.JELLYFIN_SERVER_URL } catch (_: Throwable) { "" }.ifEmpty { "https://cinode.zerolord.com" }
-            val serverUrl = rawServerUrl.trimEnd('/')
-            val apiKey = try { BuildConfig.JELLYFIN_API_KEY } catch (_: Throwable) { "" }.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
-
             try {
-                val directUrl = "$serverUrl/Library/MediaFolders"
-                val res = jellyfinApiService.getMediaFolders(url = directUrl, authHeader = authHeader, apiKey = apiKey)
-                if (res.Items.isNotEmpty()) {
-                    return@withContext res.Items
+                val endpoint = backendBaseUrl + "jellyfin/folders.php"
+                val res = backendApiService.getMediaFolders(endpoint)
+                if (res.isSuccess && res.data?.Items != null) {
+                    return@withContext res.data.Items
                 }
             } catch (e: Exception) {
-                try {
-                    val endpoint = backendBaseUrl + "jellyfin/folders.php"
-                    val res = backendApiService.getMediaFolders(endpoint)
-                    if (res.isSuccess && res.data?.Items != null) {
-                        return@withContext res.data.Items
-                    }
-                } catch (_: Exception) {}
+                // Return empty if backend fails
             }
             emptyList()
         }
@@ -443,9 +420,7 @@ class JellyfinRepository(
     ): List<JellyfinItem> {
         return withContext(Dispatchers.IO) {
             val server = activeServer ?: getActiveServer()
-            val rawServerUrl = server?.url ?: try { BuildConfig.JELLYFIN_SERVER_URL } catch (_: Throwable) { "" }.ifEmpty { "https://cinode.zerolord.com" }
-            val serverUrl = rawServerUrl.trimEnd('/')
-            val apiKey = try { BuildConfig.JELLYFIN_API_KEY } catch (_: Throwable) { "" }.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val serverUrl = server?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
 
             val includeType = when (type) {
                 MediaType.MOVIE -> "Movie,Video"
@@ -455,31 +430,17 @@ class JellyfinRepository(
                 else -> null
             }
 
-            // Primary Strategy: Direct communication with Jellyfin REST Server
             try {
-                val directUrl = "$serverUrl/Items"
-                var res = jellyfinApiService.getItems(
-                    url = directUrl,
-                    authHeader = authHeader,
-                    apiKey = apiKey,
-                    userId = server?.userId,
-                    includeItemTypes = includeType,
-                    searchTerm = searchQuery
-                )
-
-                if (res.Items.isEmpty() && includeType != null) {
-                    res = jellyfinApiService.getItems(
-                        url = directUrl,
-                        authHeader = authHeader,
-                        apiKey = apiKey,
-                        userId = server?.userId,
-                        includeItemTypes = null,
-                        searchTerm = searchQuery
-                    )
+                val endpoint = backendBaseUrl + "jellyfin/items.php"
+                var res = backendApiService.getItems(endpoint, includeItemTypes = includeType, searchTerm = searchQuery)
+                
+                // Fallback to fetch without includeItemTypes if specific filter returned empty
+                if (res.isSuccess && (res.data?.Items == null || res.data.Items.isEmpty()) && includeType != null) {
+                    res = backendApiService.getItems(endpoint, includeItemTypes = null, searchTerm = searchQuery)
                 }
 
-                if (res.Items.isNotEmpty()) {
-                    val rawItems = res.Items
+                if (res.isSuccess && !res.data?.Items.isNullOrEmpty()) {
+                    val rawItems = res.data!!.Items!!
                     val mapped = rawItems.map { dto ->
                         val isSeries = dto.Type == "Series" || dto.Type == "Season" || dto.Type == "Episode" || !dto.SeriesName.isNullOrBlank()
                         val mType = when {
@@ -490,9 +451,9 @@ class JellyfinRepository(
                             else -> type ?: MediaType.MOVIE
                         }
 
-                        val poster = "$serverUrl/Items/${dto.Id}/Images/Primary?api_key=$apiKey"
-                        val backdrop = "$serverUrl/Items/${dto.Id}/Images/Backdrop?api_key=$apiKey"
-                        val video = "$serverUrl/Videos/${dto.Id}/stream.mp4?static=true&api_key=$apiKey"
+                        val poster = "$serverUrl/Items/${dto.Id}/Images/Primary"
+                        val backdrop = "$serverUrl/Items/${dto.Id}/Images/Backdrop"
+                        val video = "$serverUrl/Videos/${dto.Id}/stream.mp4"
 
                         JellyfinItem(
                             id = dto.Id,
@@ -535,56 +496,9 @@ class JellyfinRepository(
                     return@withContext if (filtered.isNotEmpty()) filtered else mapped
                 }
             } catch (e: Exception) {
-                // Secondary Strategy: Fallback via PHP backend endpoint if direct server call fails
-                try {
-                    val endpoint = backendBaseUrl + "jellyfin/items.php"
-                    var res = backendApiService.getItems(endpoint, includeItemTypes = includeType, searchTerm = searchQuery)
-                    if (res.isSuccess && (res.data?.Items == null || res.data.Items.isEmpty()) && includeType != null) {
-                        res = backendApiService.getItems(endpoint, includeItemTypes = null, searchTerm = searchQuery)
-                    }
-
-                    if (res.isSuccess && !res.data?.Items.isNullOrEmpty()) {
-                        val rawItems = res.data!!.Items!!
-                        val mapped = rawItems.map { dto ->
-                            val isSeries = dto.Type == "Series" || dto.Type == "Season" || dto.Type == "Episode" || !dto.SeriesName.isNullOrBlank()
-                            val mType = when {
-                                dto.Type == "Movie" || (dto.Type == "Video" && dto.SeriesName.isNullOrBlank()) -> MediaType.MOVIE
-                                isSeries -> MediaType.SERIES
-                                dto.Type == "LiveTv" || dto.Type == "TvChannel" || dto.Type == "Channel" -> MediaType.LIVE_TV
-                                dto.Type == "MusicAlbum" || dto.Type == "Audio" || dto.Type == "MusicVideo" -> MediaType.MUSIC_ALBUM
-                                else -> type ?: MediaType.MOVIE
-                            }
-
-                            val poster = "$serverUrl/Items/${dto.Id}/Images/Primary?api_key=$apiKey"
-                            val backdrop = "$serverUrl/Items/${dto.Id}/Images/Backdrop?api_key=$apiKey"
-                            val video = "$serverUrl/Videos/${dto.Id}/stream.mp4?static=true&api_key=$apiKey"
-
-                            JellyfinItem(
-                                id = dto.Id,
-                                title = dto.Name ?: "Untitled Stream",
-                                overview = dto.Overview ?: "Experience high-fidelity 4K streaming directly on Cinode.",
-                                mediaType = mType,
-                                posterUrl = poster,
-                                backdropUrl = backdrop,
-                                videoUrl = video,
-                                rating = (dto.CommunityRating ?: 8.8f).toString(),
-                                year = (dto.ProductionYear ?: 2026).toString(),
-                                durationMs = (dto.RunTimeTicks ?: 72000000000L) / 10000L,
-                                seriesName = dto.SeriesName,
-                                genres = if (!dto.Genres.isNullOrEmpty()) dto.Genres else listOf("Sci-Fi", "Action", "Adventure")
-                            )
-                        }
-
-                        val filtered = if (type != null) {
-                            mapped.filter { it.mediaType == type }
-                        } else mapped
-
-                        return@withContext if (filtered.isNotEmpty()) filtered else mapped
-                    }
-                } catch (_: Exception) {}
+                // Fallback to cache if network fails
             }
 
-            // Tertiary Strategy: Room Local Cache
             val cached = mediaCacheDao?.getAllCached()
             if (!cached.isNullOrEmpty()) {
                 val cachedMapped = cached.map { c ->
@@ -616,51 +530,27 @@ class JellyfinRepository(
     suspend fun getEpisodesForSeries(seriesId: String): List<Episode> {
         return withContext(Dispatchers.IO) {
             val server = getActiveServer()
-            val rawServerUrl = server?.url ?: try { BuildConfig.JELLYFIN_SERVER_URL } catch (_: Throwable) { "" }.ifEmpty { "https://cinode.zerolord.com" }
-            val serverUrl = rawServerUrl.trimEnd('/')
-            val apiKey = try { BuildConfig.JELLYFIN_API_KEY } catch (_: Throwable) { "" }.ifEmpty { "79ee2e15ee1f47fd881188ef4da13391" }
+            val serverUrl = server?.url ?: BuildConfig.JELLYFIN_SERVER_URL.ifEmpty { "https://cinode.zerolord.com" }
 
             try {
-                val directUrl = "$serverUrl/Shows/$seriesId/Episodes"
-                val res = jellyfinApiService.getEpisodes(
-                    url = directUrl,
-                    authHeader = authHeader,
-                    apiKey = apiKey,
-                    userId = server?.userId
-                )
-                if (res.Items.isNotEmpty()) {
-                    return@withContext res.Items.mapIndexed { idx, dto ->
+                val endpoint = backendBaseUrl + "jellyfin/episodes.php"
+                val res = backendApiService.getEpisodes(endpoint, seriesId)
+                if (res.isSuccess && res.data?.Items != null) {
+                    return@withContext res.data.Items.mapIndexed { idx, dto ->
                         Episode(
                             id = dto.Id,
                             title = dto.Name ?: "Episode ${idx + 1}",
-                            episodeNumber = dto.IndexNumber ?: (idx + 1),
-                            seasonNumber = dto.SeasonNumber ?: 1,
+                            episodeNumber = idx + 1,
+                            seasonNumber = 1,
                             overview = dto.Overview ?: "Cinode VIP Episode",
                             durationMs = (dto.RunTimeTicks ?: 27000000000L) / 10000L,
-                            thumbnailUrl = "$serverUrl/Items/${dto.Id}/Images/Primary?api_key=$apiKey",
-                            videoUrl = "$serverUrl/Videos/${dto.Id}/stream.mp4?static=true&api_key=$apiKey"
+                            thumbnailUrl = "$serverUrl/Items/${dto.Id}/Images/Primary",
+                            videoUrl = "$serverUrl/Videos/${dto.Id}/stream.mp4"
                         )
                     }
                 }
             } catch (e: Exception) {
-                try {
-                    val endpoint = backendBaseUrl + "jellyfin/episodes.php"
-                    val res = backendApiService.getEpisodes(endpoint, seriesId)
-                    if (res.isSuccess && res.data?.Items != null) {
-                        return@withContext res.data.Items.mapIndexed { idx, dto ->
-                            Episode(
-                                id = dto.Id,
-                                title = dto.Name ?: "Episode ${idx + 1}",
-                                episodeNumber = dto.IndexNumber ?: (idx + 1),
-                                seasonNumber = dto.SeasonNumber ?: 1,
-                                overview = dto.Overview ?: "Cinode VIP Episode",
-                                durationMs = (dto.RunTimeTicks ?: 27000000000L) / 10000L,
-                                thumbnailUrl = "$serverUrl/Items/${dto.Id}/Images/Primary?api_key=$apiKey",
-                                videoUrl = "$serverUrl/Videos/${dto.Id}/stream.mp4?static=true&api_key=$apiKey"
-                            )
-                        }
-                    }
-                } catch (_: Exception) {}
+                // Return empty if fails
             }
 
             emptyList()

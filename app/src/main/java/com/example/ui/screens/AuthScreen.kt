@@ -286,8 +286,8 @@ fun AuthScreen(
     var activeTab by remember { mutableStateOf(AuthTab.LOGIN) }
 
     // Form states
-    var loginUsername by remember { mutableStateOf("duwit") }
-    var loginPassword by remember { mutableStateOf("@f33rinimi") }
+    var loginUsername by remember { mutableStateOf("") }
+    var loginPassword by remember { mutableStateOf("") }
     var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
     var rememberMe by remember { mutableStateOf(true) }
 

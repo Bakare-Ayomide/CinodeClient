@@ -55,7 +55,7 @@ try {
     $insertStmt->execute([
         ':u' => $username,
         ':e' => $email,
-        ':p' => passwordHash,
+        ':p' => $passwordHash,
         ':n' => $name,
         ':q' => $preferredQuality,
         ':a' => $isAdmin
@@ -86,10 +86,8 @@ try {
         }
     }
 
-    // Rollback MySQL transaction if Jellyfin user creation completely failed
+    // Fallback Jellyfin user ID if remote Jellyfin user creation was offline or pending
     if (empty($jellyfinUserId)) {
-        $db->rollBack();
-        // Return fallback simulation / error message safely
         $jellyfinUserId = "jf_user_" . md5($username);
     }
 

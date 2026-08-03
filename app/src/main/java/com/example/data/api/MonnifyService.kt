@@ -50,8 +50,8 @@ class MonnifyService {
         return withContext(Dispatchers.IO) {
             MonnifyAuthResponse(
                 isSuccess = true,
-                accessToken = "PHP_BACKEND_SECURE_TOKEN",
-                message = "Monnify Authentication secured via PHP Backend REST API."
+                accessToken = "SECURE_BACKEND_TOKEN",
+                message = "Authentication secured via Backend API."
             )
         }
     }
@@ -129,7 +129,7 @@ class MonnifyService {
                         virtualAccountNumber = vAcc,
                         bankName = bName,
                         ussdCode = ussd,
-                        message = json.optString("message", "Monnify Checkout Initialized via PHP REST API.")
+                        message = json.optString("message", "Monnify Checkout Initialized.")
                     )
                 }
             } catch (e: Exception) {
@@ -144,7 +144,7 @@ class MonnifyService {
                 virtualAccountNumber = defaultVirtualAccount,
                 bankName = "Wema Bank / Monnify Gateway",
                 ussdCode = defaultUssd,
-                message = "Monnify Checkout Initialized via PHP Backend REST API."
+                message = "Monnify Checkout Initialized."
             )
         }
     }
@@ -186,7 +186,7 @@ class MonnifyService {
                         isSuccess = true,
                         paymentStatus = status,
                         amountPaid = amtPaid,
-                        message = json.optString("message", "Payment verified via PHP REST API.")
+                        message = json.optString("message", "Payment verified.")
                     )
                 }
             } catch (e: Exception) {
@@ -197,7 +197,7 @@ class MonnifyService {
                 isSuccess = true,
                 paymentStatus = "PAID",
                 amountPaid = config.streamPriceNgn,
-                message = "Monnify Payment Verified via PHP REST API Backend!"
+                message = "Monnify Payment Verified!"
             )
         }
     }

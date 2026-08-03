@@ -76,7 +76,7 @@ fun ServerConnectScreen(
     errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
+    var serverUrl by remember { mutableStateOf("https://cinback.zerolord.com") }
     var useApiKey by remember { mutableStateOf(true) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

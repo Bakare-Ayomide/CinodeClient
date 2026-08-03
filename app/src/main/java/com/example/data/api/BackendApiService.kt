@@ -96,6 +96,12 @@ interface BackendApiService {
         @Body request: BackendChangePasswordRequest
     ): BackendApiResponse<Unit>
 
+    @GET
+    suspend fun getUserProfile(
+        @Url url: String,
+        @Query("username") username: String
+    ): BackendApiResponse<BackendAuthData>
+
     @POST
     suspend fun initializePayment(
         @Url url: String,

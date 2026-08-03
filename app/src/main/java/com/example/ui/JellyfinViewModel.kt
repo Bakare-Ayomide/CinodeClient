@@ -147,19 +147,19 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun restoreUserSession() {
-        val isAuth = prefs.getBoolean("is_authenticated", true)
-        val email = prefs.getString("user_email", "guest@cinode.zerolord.com") ?: "guest@cinode.zerolord.com"
-        val name = prefs.getString("user_name", "Jellyfin Streaming User") ?: "Jellyfin Streaming User"
-        val onboardingDone = prefs.getBoolean("is_onboarding_completed", true)
+        val isAuth = prefs.getBoolean("is_authenticated", false)
+        val email = prefs.getString("user_email", "") ?: ""
+        val name = prefs.getString("user_name", "") ?: ""
+        val onboardingDone = prefs.getBoolean("is_onboarding_completed", false)
 
         _uiState.value = _uiState.value.copy(
             isAuthenticated = isAuth,
             currentUserEmail = email,
-            currentUserName = name.ifBlank { "Jellyfin Streaming User" },
+            currentUserName = name.ifBlank { "Cinode Streamer" },
             showAuthFlow = !isAuth,
-            showOnboardingFlow = false,
+            showOnboardingFlow = isAuth && !onboardingDone,
             isOnboardingCompleted = onboardingDone,
-            currentDestination = NavDestination.HOME
+            currentDestination = if (isAuth && !onboardingDone) NavDestination.ONBOARDING else NavDestination.HOME
         )
     }
 
@@ -533,17 +533,19 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
             val res = repository.signupUser(name, email, pass, serverUrl)
             res.fold(
                 onSuccess = { server ->
-                    val finalName = name.ifBlank { "Jellyfin User" }
+                    val finalName = name.ifBlank { "Cinode User" }
                     saveUserSession(email, finalName)
+                    prefs.edit().putBoolean("is_onboarding_completed", false).apply()
                     _uiState.value = _uiState.value.copy(
                         activeServer = server,
                         isAuthenticated = true,
                         currentUserEmail = email,
                         currentUserName = finalName,
                         showAuthFlow = false,
-                        showOnboardingFlow = false,
+                        showOnboardingFlow = true,
+                        isOnboardingCompleted = false,
                         isLoading = false,
-                        currentDestination = NavDestination.HOME
+                        currentDestination = NavDestination.ONBOARDING
                     )
                     loadAllServerItems(server)
                     onResult(true, null)
@@ -629,7 +631,8 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(
             isOnboardingCompleted = true,
             showOnboardingFlow = false,
-            showAuthFlow = !_uiState.value.isAuthenticated
+            showAuthFlow = !_uiState.value.isAuthenticated,
+            currentDestination = NavDestination.HOME
         )
     }
 
@@ -649,14 +652,27 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
 
     // Monnify Paywall & Gateway Management
     fun playMediaWithPaywallCheck(item: JellyfinItem, isAdmin: Boolean = false) {
-        val config = monnifyConfig.value
-        val paidIds = paidStreamItemIds.value
-        val isVip = paidIds.contains("VIP_PASS")
-        val isItemPaid = paidIds.contains(item.id)
+        viewModelScope.launch {
+            val config = monnifyConfig.value
+            val paidIds = paidStreamItemIds.value
+            val isVip = paidIds.contains("VIP_PASS")
+            val isItemPaid = paidIds.contains(item.id)
 
-        if (!config.isPaywallEnabled || isAdmin || isVip || isItemPaid) {
-            playMedia(item)
-        } else {
+            if (!config.isPaywallEnabled || isAdmin || isVip || isItemPaid) {
+                playMedia(item)
+                return@launch
+            }
+
+            // Verify subscription status with PHP backend
+            val email = _uiState.value.currentUserEmail
+            if (email.isNotBlank()) {
+                val isBackendPremium = repository.checkUserSubscriptionStatus(email)
+                if (isBackendPremium) {
+                    playMedia(item)
+                    return@launch
+                }
+            }
+
             _uiState.value = _uiState.value.copy(
                 itemPendingPayment = item,
                 showMonnifyPaymentModal = true
@@ -686,6 +702,7 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
                 val targetTitle = if (isVip) "VIP All-Access Pass" else item.title
                 val amount = if (isVip) config.vipPassPriceNgn else config.streamPriceNgn
                 val email = _uiState.value.currentUserEmail.ifBlank { "user@cinode.stream" }
+                val username = email.substringBefore("@").ifBlank { _uiState.value.currentUserName }
 
                 // 1. Initialize with Monnify Payment Service initialized with admin credentials
                 val initRes = repository.monnifyPaymentService.processSubscriptionPayment(
@@ -695,9 +712,14 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
                     amountNgn = amount
                 )
 
-                // 2. Record transaction in Room DB
+                val effectiveRef = if (initRes.paymentReference.isNotBlank()) initRes.paymentReference else paymentRef
+
+                // 2. Verify payment with PHP backend to activate premium in MySQL DB
+                repository.verifyPaymentWithBackend(effectiveRef, username)
+
+                // 3. Record transaction in Room DB
                 val transaction = MonnifyTransactionEntity(
-                    paymentRef = if (initRes.paymentReference.isNotBlank()) initRes.paymentReference else paymentRef,
+                    paymentRef = effectiveRef,
                     itemId = targetItemId,
                     itemTitle = targetTitle,
                     userEmail = email,
@@ -711,7 +733,7 @@ class JellyfinViewModel(application: Application) : AndroidViewModel(application
                 )
                 repository.recordMonnifyTransaction(transaction)
 
-                // 3. Unlock stream & launch Player
+                // 4. Automatically unlock stream & launch Player directly without pressing Play again
                 closeMonnifyPaymentModal()
                 playMedia(item)
                 onResult(true, "Monnify Payment Successful! Stream unlocked.")

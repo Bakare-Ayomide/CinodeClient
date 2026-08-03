@@ -1,10 +1,14 @@
 package com.example.data.repository
 
 import android.content.Context
+import android.util.Log
+import org.json.JSONObject
+import okhttp3.Interceptor
 import com.example.BuildConfig
 import com.example.data.api.BackendApiService
 import com.example.data.api.BackendChangePasswordRequest
 import com.example.data.api.BackendLoginRequest
+import com.example.data.api.BackendPaymentVerifyRequest
 import com.example.data.api.BackendSignupRequest
 import com.example.data.api.CreateUserByNameRequest
 import com.example.data.api.JellyfinActivityLogDto
@@ -70,7 +74,53 @@ class JellyfinRepository(
     val monnifyPaymentService: MonnifyService = monnifyService
     private val activeDownloadJobs = ConcurrentHashMap<String, Job>()
 
+    private fun sanitizeBackendBaseUrl(rawUrl: String): String {
+        var url = rawUrl.trim()
+        if (url.isEmpty()) {
+            url = "https://cinback.zerolord.com/api/"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
+        if (!url.endsWith("api/")) {
+            url = "${url}api/"
+        }
+        return url
+    }
+
+    private fun formatNetworkException(e: Exception, endpointUrl: String): String {
+        Log.e("JellyfinRepository", "Network call failed for URL: $endpointUrl", e)
+        if (e is retrofit2.HttpException) {
+            val code = e.code()
+            val errorBody = e.response()?.errorBody()?.string()
+            val serverMessage = try {
+                if (!errorBody.isNullOrBlank()) {
+                    val json = JSONObject(errorBody)
+                    json.optString("message", null)
+                } else null
+            } catch (_: Exception) { null }
+
+            if (!serverMessage.isNullOrBlank()) {
+                return serverMessage.replace("PHP", "Server").replace("Jellyfin", "Media")
+            }
+            if (code == 404) {
+                return "Endpoint not found (HTTP 404 at $endpointUrl)"
+            }
+            return "Server error (HTTP $code at $endpointUrl)"
+        }
+        val rawMsg = e.message ?: "Network connection error"
+        if (rawMsg.contains("404")) {
+            return "Endpoint not found (HTTP 404 at $endpointUrl)"
+        }
+        return "Server connection error: ${rawMsg.replace("PHP", "Backend").replace("Jellyfin", "Media")}"
+    }
+
     private val okHttpClient: OkHttpClient by lazy {
+        val loggingInterceptor = Interceptor { chain ->
+            val request = chain.request()
+            Log.d("API_NETWORK_AUDIT", "--> Requesting URL: ${request.url}")
+            chain.proceed(request)
+        }
         try {
             val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
                 override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
@@ -83,6 +133,7 @@ class JellyfinRepository(
             val sslSocketFactory = sslContext.socketFactory
 
             OkHttpClient.Builder()
+                .addInterceptor(loggingInterceptor)
                 .sslSocketFactory(sslSocketFactory, trustAllCerts[0] as X509TrustManager)
                 .hostnameVerifier { _, _ -> true }
                 .connectTimeout(15, TimeUnit.SECONDS)
@@ -91,6 +142,7 @@ class JellyfinRepository(
                 .build()
         } catch (e: Exception) {
             OkHttpClient.Builder()
+                .addInterceptor(loggingInterceptor)
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .build()
@@ -98,10 +150,7 @@ class JellyfinRepository(
     }
 
     private val backendBaseUrl: String
-        get() {
-            val url = BuildConfig.CINJELLY_BACKEND_URL.ifEmpty { "https://cinback.zerolord.com/api/" }
-            return if (url.endsWith("/")) url else "$url/"
-        }
+        get() = sanitizeBackendBaseUrl(BuildConfig.CINJELLY_BACKEND_URL)
 
     private val moshi = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
@@ -279,10 +328,10 @@ class JellyfinRepository(
                         )
                     )
                 } else {
-                    return@withContext Result.failure(Exception(response.message.ifBlank { "Signup failed on PHP Backend." }))
+                    return@withContext Result.failure(Exception(response.message.ifBlank { "Signup failed on backend server." }))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception("PHP Backend connection error: ${e.message}"))
+                Result.failure(Exception(formatNetworkException(e, signupEndpoint)))
             }
         }
     }
@@ -293,8 +342,8 @@ class JellyfinRepository(
         newPw: String
     ): Result<Unit> {
         return withContext(Dispatchers.IO) {
+            val endpoint = backendBaseUrl + "auth/change_password.php"
             try {
-                val endpoint = backendBaseUrl + "auth/change_password.php"
                 val response = backendApiService.changePassword(
                     endpoint,
                     BackendChangePasswordRequest(username, currentPw, newPw)
@@ -302,10 +351,41 @@ class JellyfinRepository(
                 if (response.isSuccess) {
                     Result.success(Unit)
                 } else {
-                    Result.failure(Exception(response.message))
+                    Result.failure(Exception(response.message.replace("PHP", "Server")))
                 }
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception(formatNetworkException(e, endpoint)))
+            }
+        }
+    }
+
+    suspend fun checkUserSubscriptionStatus(emailOrUsername: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val username = if (emailOrUsername.contains("@")) emailOrUsername.substringBefore("@") else emailOrUsername
+                val endpoint = backendBaseUrl + "auth/profile.php"
+                val response = backendApiService.getUserProfile(endpoint, username)
+                if (response.isSuccess && response.data != null) {
+                    return@withContext response.data.is_premium == true
+                }
+            } catch (e: Exception) {
+                // Fallback on network failure
+            }
+            return@withContext false
+        }
+    }
+
+    suspend fun verifyPaymentWithBackend(paymentRef: String, username: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val endpoint = backendBaseUrl + "payments/verify.php"
+                val response = backendApiService.verifyPayment(
+                    endpoint,
+                    BackendPaymentVerifyRequest(payment_reference = paymentRef, username = username)
+                )
+                return@withContext response.isSuccess && response.data?.isPremiumActivated == true
+            } catch (e: Exception) {
+                return@withContext false
             }
         }
     }

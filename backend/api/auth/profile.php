@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../config/config.php';
 
 $input = get_json_input();
-$username = trim($input['username'] ?? '');
+$username = trim($input['username'] ?? $_GET['username'] ?? '');
 
 if (empty($username)) {
     json_response(false, null, "Username is required.", 400);

@@ -56,7 +56,7 @@ function get_db_config($key, $default = '') {
 }
 
 // Global Backend Configuration (SENSITIVE - Server side only!)
-define('DB_HOST', get_env('DB_HOST', '105.113.98.181'));
+define('DB_HOST', get_env('DB_HOST', 'localhost'));
 define('DB_PORT', get_env('DB_PORT', '3306'));
 define('DB_NAME', get_env('DB_NAME', 'zerolord_cinback'));
 define('DB_USER', get_env('DB_USER', 'zerolord_cinback'));

@@ -288,7 +288,7 @@ fun AuthScreen(
     // Form states
     var loginUsername by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
-    var serverUrl by remember { mutableStateOf("https://cinode.zerolord.com") }
+    var serverUrl by remember { mutableStateOf("https://cinback.zerolord.com") }
     var rememberMe by remember { mutableStateOf(true) }
 
     var signupName by remember { mutableStateOf("") }
@@ -299,6 +299,7 @@ fun AuthScreen(
     var acceptTerms by remember { mutableStateOf(true) }
 
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var isSignupPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -711,8 +712,18 @@ fun AuthScreen(
                                 onValueChange = { signupPassword = it },
                                 placeholder = { Text("Minimum 6 characters", color = TextMuted) },
                                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = JellyfinPurple) },
-                                visualTransformation = PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { isSignupPasswordVisible = !isSignupPasswordVisible }) {
+                                        Icon(
+                                            imageVector = if (isSignupPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = "Toggle password visibility",
+                                            tint = TextMuted
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (isSignupPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = JellyfinPurple,
                                     unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
